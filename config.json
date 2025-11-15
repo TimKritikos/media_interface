@@ -1,23 +1,11 @@
 {
-	"gopro": [
+	"source_media": [
 		{
-			"id": "GOPR0123",
-			"kind": "Video",
-			"files": [
-				"/backup/GoPro1/GOPR0123.MP4",
-				"/backup/GoPro1/GOPR0123_LR.MP4",
-				"/backup/GoPro1/GOPR0123.THM" ],
-			"representative": "/backup/GoPro1/GOPR0123.THM"
-		}
-	],
-	"sony_a7": [
-		{
-			"id": "DSC00045",
-			"kind": "Photo",
-			"files": [
-				"/backup/SonyA7/DCIM/100MSDCF/DSC00045.JPG",
-				"/backup/SonyA7/DCIM/100MSDCF/DSC00045.ARW" ],
-			"representative": "/backup/SonyA7/DCIM/100MSDCF/DSC00045.JPG"
+			"path": "GoPro_SN:3142",
+			"handler": "GoPro-Generic-1"
+		},{
+			"path": "Sony_SN:234",
+			"handler": "Sony-ILCEM4"
 		}
 	]
 }

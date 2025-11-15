@@ -22,15 +22,13 @@ struct Cli {
 /// ------------------------------------------------------------
 #[derive(Debug, Deserialize)]
 struct Config {
-    cameras: Vec<CameraEntry>
+    source_media: Vec<SourceMediaEntry>
 }
 
 #[derive(Debug, Deserialize)]
-struct CameraEntry {
-    name: String,
-    paths: Vec<PathBuf>,
-    #[serde(rename = "type")]
-    camera_type: String
+struct SourceMediaEntry {
+    handler: String,
+    path: PathBuf,
 }
 
 /// ------------------------------------------------------------
@@ -153,6 +151,7 @@ fn group_by_normalized_name(root: &Path) -> Result<Vec<AssetItem>> {
 
 trait CameraAdapter {
     fn scan(&self, root: &Path) -> Result<Vec<AssetItem>>;
+    fn name(&self) -> String;
 }
 
 struct GoProAdapter;
@@ -162,6 +161,9 @@ struct SonyAdapter;
 impl CameraAdapter for GoProAdapter {
     fn scan(&self, root: &Path) -> Result<Vec<AssetItem>> {
         group_by_normalized_name(root)
+    }
+    fn name(&self) -> String {
+        return String::from("GoPro handler!");
     }
 }
 
@@ -197,13 +199,16 @@ impl CameraAdapter for SonyAdapter {
         }
         Ok(out)
     }
+    fn name(&self) -> String {
+        return String::from("Sony handler!");
+    }
 }
 
 /// Map camera type string to actual adapter object
 fn get_adapter(t: &str) -> Result<Box<dyn CameraAdapter>> {
     Ok(match t {
-        "gopro" => Box::new(GoProAdapter),
-        "sony" => Box::new(SonyAdapter),
+        "GoPro-Generic-1" => Box::new(GoProAdapter),
+        "Sony-ILCEM4" => Box::new(SonyAdapter),
         unknown  => anyhow::bail!("Unknown camera type: {}", unknown)
     })
 }
@@ -222,18 +227,20 @@ fn main() -> Result<()> {
 
     let mut results: HashMap<String, Vec<AssetItem>> = HashMap::new();
 
-    for cam in cfg.cameras {
-        let adapter = get_adapter(&cam.camera_type)?;
-        let mut items = Vec::new();
+    for cam in cfg.source_media {
+        let handler = get_adapter(&cam.handler)?;
+        let path = cam.path;
+        println!("Using {} at {:?}",handler.name(),path);
+        //let mut items = Vec::new();
 
-        for path in cam.paths {
-            let path = path.canonicalize()?;
-            let mut scanned = adapter.scan(&path)
-                .with_context(|| format!("Scanning camera '{}' at {:?}", cam.name, path))?;
-            items.append(&mut scanned);
-        }
+        //for path in cam.paths {
+        //    let path = path.canonicalize()?;
+        //    let mut scanned = adapter.scan(&path)
+        //        .with_context(|| format!("Scanning camera '{}' at {:?}", cam.name, path))?;
+        //    items.append(&mut scanned);
+        //}
 
-        results.insert(cam.name.clone(), items);
+        //#results.insert(cam.name.clone(), items);
     }
 
     // Emit everything as JSON to stdout
