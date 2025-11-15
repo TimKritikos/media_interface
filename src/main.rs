@@ -127,6 +127,14 @@ fn value_for_path<'a, T>(
 /// ------------------------------------------------------------
 /// Main
 /// ------------------------------------------------------------
+
+#[derive(Serialize, Deserialize)]
+struct fail_json_output {
+    data_type: &'static str,
+    version: &'static str,
+    command_success: bool,
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -139,7 +147,6 @@ fn main() -> Result<()> {
     let mut handler_locations: Vec<(PathBuf, String)> = Vec::new();
 
     for cam in cfg.source_media {
-        //let handler = get_adapter(&cam.handler)?;
         let path: PathBuf = match fs::canonicalize(cam.path.join(cam.card_subdir)) {
             Ok(p) => p,
             Err(e) => {
@@ -151,6 +158,12 @@ fn main() -> Result<()> {
         handler_locations.push((path,cam.handler));
     }
 
+    let mut output = fail_json_output{
+        data_type: "source_media_interface_api",
+        version: env!("CARGO_PKG_VERSION"),
+        command_success: false,
+    };
+
     if let Some(path_buf) = cli.low_quality_list.as_ref() {
         let path: &Path = path_buf.as_ref();
         let file: PathBuf = match fs::canonicalize(path) {
@@ -161,15 +174,15 @@ fn main() -> Result<()> {
             }
         };
         if let Some(value) = value_for_path(&file, &handler_locations) {
-            println!("Matched value: {value}");
+            //let handler = get_adapter(&cam.handler)?;
+            output.command_success=true;
         } else {
-            println!("No matching directory");
         }
     }
 
     // Emit everything as JSON to stdout
-    //let json = serde_json::to_string_pretty(&results)?;
-    //println!("{}", json);
+    let json = serde_json::to_string(&output)?;
+    println!("{}", json);
 
     Ok(())
 }
