@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use clap::Parser;
+use clap::{Parser, ArgGroup};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -11,10 +11,31 @@ use walkdir::WalkDir;
 /// Command line interface
 /// ------------------------------------------------------------
 #[derive(Parser)]
+#[clap(author, version, about)]
+#[command(group(
+    ArgGroup::new("action")
+        .required(true)
+        .args(&["low_quality_list", "high_quality_list", "get_related"])
+))]
 struct Cli {
     /// Path to config JSON
-    #[arg(short, long)]
-    config: PathBuf
+    #[arg(short='c', long="config", required=true)]
+    config: PathBuf,
+
+    /// Print a JSON object with a list of files and info representing items under the given
+    /// directory, prefering the lowest quality representation of the item
+    #[arg(short='l', long="list-thumbnail", value_name="dir path" )]
+    low_quality_list: Option<PathBuf>,
+
+    /// Print a JSON object with a list of files and info representing items under the given
+    /// directory, prefering the highest quality representation of the item
+    #[arg(short='L', long="list-high-quality", value_name="dir path")]
+    high_quality_list: Option<PathBuf>,
+
+    /// Given a file this will output a JSON object with a list of all files in the item that
+    /// represent the file
+    #[arg(short='g', long="get-related", num_args=1, value_name="file path")]
+    get_related: Option<PathBuf>,
 }
 
 /// ------------------------------------------------------------
