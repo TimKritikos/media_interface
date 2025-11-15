@@ -53,33 +53,11 @@ struct SourceMediaEntry {
 }
 
 /// ------------------------------------------------------------
-/// Output structures
-/// ------------------------------------------------------------
-#[derive(Debug, Clone, Serialize)]
-enum AssetKind {
-    Photo,
-    Video,
-    Other
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct AssetItem {
-    id: String,
-    kind: AssetKind,
-    /// All related files
-    files: Vec<PathBuf>,
-    /// The best file to show as preview
-    representative: PathBuf
-}
-
-
-/// ------------------------------------------------------------
 /// Camera adapters
 /// ------------------------------------------------------------
 
 trait SourceMediaAdapter {
-    fn scan(&self, root: &Path) -> Result<Vec<AssetItem>>;
-    fn name(&self) -> String;
+    fn list_items(&self) -> Vec<FileItem>;
 }
 
 struct GoProAdapter;
@@ -87,21 +65,21 @@ struct SonyAdapter;
 
 /// For GoPro: top-level directory, all files mixed — just use generic grouping
 impl SourceMediaAdapter for GoProAdapter {
-    fn scan(&self, root: &Path) -> Result<Vec<AssetItem>> {
-        Ok(Vec::<AssetItem>::new())
-    }
-    fn name(&self) -> String {
-        return String::from("GoPro handler!");
+    fn list_items(&self) -> Vec<FileItem> {
+        let mut ret: Vec<FileItem> = Vec::<FileItem>::new();
+        ret.push(FileItem{
+            file_path:"no_file".to_string(),
+            file_type:"no_file".to_string(),
+            item_type:"no_file".to_string()
+        });
+        return ret
     }
 }
 
 /// For Sony: handle DCIM & PRIVATE/M4ROOT with custom subfolders
 impl SourceMediaAdapter for SonyAdapter {
-    fn scan(&self, root: &Path) -> Result<Vec<AssetItem>> {
-        Ok(Vec::<AssetItem>::new())
-    }
-    fn name(&self) -> String {
-        return String::from("Sony handler!");
+    fn list_items(&self) -> Vec<FileItem> {
+        return Vec::<FileItem>::new();
     }
 }
 
@@ -133,6 +111,14 @@ struct fail_json_output {
     data_type: &'static str,
     version: &'static str,
     command_success: bool,
+    file_list: Vec<FileItem>
+}
+
+#[derive(Serialize, Deserialize)]
+struct FileItem {
+    file_path: String,
+    file_type: String,
+    item_type: String
 }
 
 fn main() -> Result<()> {
@@ -162,6 +148,7 @@ fn main() -> Result<()> {
         data_type: "source_media_interface_api",
         version: env!("CARGO_PKG_VERSION"),
         command_success: false,
+        file_list: Vec::<FileItem>::new()
     };
 
     if let Some(path_buf) = cli.low_quality_list.as_ref() {
@@ -173,8 +160,10 @@ fn main() -> Result<()> {
                 return Ok(());
             }
         };
+
         if let Some(value) = value_for_path(&file, &handler_locations) {
-            //let handler = get_adapter(&cam.handler)?;
+            let handler = get_adapter(&value)?;
+            output.file_list=handler.list_items();
             output.command_success=true;
         } else {
         }
