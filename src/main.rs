@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
+use std::fs;
 
 /// ------------------------------------------------------------
 /// Command line interface
@@ -49,6 +50,7 @@ struct Config {
 #[derive(Debug, Deserialize)]
 struct SourceMediaEntry {
     handler: String,
+    card_subdir: PathBuf,
     path: PathBuf,
 }
 
@@ -234,6 +236,16 @@ fn get_adapter(t: &str) -> Result<Box<dyn CameraAdapter>> {
     })
 }
 
+fn value_for_path<'a, T>(
+    file: &Path,
+    dirs: &'a [(PathBuf, T)],
+    ) -> Option<&'a T> {
+
+    dirs.iter()
+        .find(|(dir, _)| file.starts_with(dir))
+        .map(|(_, v)| v)
+}
+
 /// ------------------------------------------------------------
 /// Main
 /// ------------------------------------------------------------
@@ -246,12 +258,20 @@ fn main() -> Result<()> {
 
     let cfg: Config = serde_json::from_str(&data)?;
 
-    let mut results: HashMap<String, Vec<AssetItem>> = HashMap::new();
+    let mut handler_locations: Vec<(PathBuf, String)> = Vec::new();
 
     for cam in cfg.source_media {
-        let handler = get_adapter(&cam.handler)?;
-        let path = cam.path;
-        println!("Using {} at {:?}",handler.name(),path);
+        //let handler = get_adapter(&cam.handler)?;
+        let path: PathBuf = match fs::canonicalize(cam.path.join(cam.card_subdir)) {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                return Ok(());
+            }
+        };
+
+        handler_locations.push((path,cam.handler));
+
         //let mut items = Vec::new();
 
         //for path in cam.paths {
@@ -264,9 +284,25 @@ fn main() -> Result<()> {
         //#results.insert(cam.name.clone(), items);
     }
 
+    if let Some(path_buf) = cli.low_quality_list.as_ref() {
+        let path: &Path = path_buf.as_ref();
+        let file: PathBuf = match fs::canonicalize(path) {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                return Ok(());
+            }
+        };
+        if let Some(value) = value_for_path(&file, &handler_locations) {
+            println!("Matched value: {value}");
+        } else {
+            println!("No matching directory");
+        }
+    }
+
     // Emit everything as JSON to stdout
-    let json = serde_json::to_string_pretty(&results)?;
-    println!("{}", json);
+    //let json = serde_json::to_string_pretty(&results)?;
+    //println!("{}", json);
 
     Ok(())
 }
