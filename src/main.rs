@@ -57,7 +57,7 @@ struct SourceMediaEntry {
 /// ------------------------------------------------------------
 
 trait SourceMediaAdapter {
-    fn list_items(&self) -> Vec<FileItem>;
+    fn list_low_quality(&self, source_media_location: &PathBuf, source_media_card: &PathBuf) -> Vec<FileItem>;
 }
 
 struct GoProAdapter;
@@ -65,20 +65,35 @@ struct SonyAdapter;
 
 /// For GoPro: top-level directory, all files mixed — just use generic grouping
 impl SourceMediaAdapter for GoProAdapter {
-    fn list_items(&self) -> Vec<FileItem> {
+    fn list_low_quality(&self,  _source_media_location: &PathBuf,  source_media_card: &PathBuf) -> Vec<FileItem> {
         let mut ret: Vec<FileItem> = Vec::<FileItem>::new();
-        ret.push(FileItem{
-            file_path:"no_file".to_string(),
-            file_type:"no_file".to_string(),
-            item_type:"no_file".to_string()
-        });
+
+        let paths = fs::read_dir(source_media_card).unwrap();
+
+        for path in paths {
+            if let Some(name) = path.unwrap().path().file_name().and_then(|n| n.to_str()) {
+                if name.ends_with(".THM") {
+                    ret.push(FileItem{
+                        file_path:name.to_string(),
+                        file_type:"image".to_string(),
+                        item_type:"video".to_string()
+                    });
+                }else if name.ends_with(".JPG") {
+                    ret.push(FileItem{
+                        file_path:name.to_string(),
+                        file_type:"image".to_string(),
+                        item_type:"image".to_string()
+                    });
+                }
+            }
+        }
         return ret
     }
 }
 
 /// For Sony: handle DCIM & PRIVATE/M4ROOT with custom subfolders
 impl SourceMediaAdapter for SonyAdapter {
-    fn list_items(&self) -> Vec<FileItem> {
+    fn list_low_quality(&self,  _source_media_location: &PathBuf,  _source_media_card: &PathBuf ) -> Vec<FileItem> {
         return Vec::<FileItem>::new();
     }
 }
@@ -95,11 +110,11 @@ fn get_adapter(t: &str) -> Result<Box<dyn SourceMediaAdapter>> {
 fn value_for_path<'a, T>(
     file: &Path,
     dirs: &'a [(PathBuf, T)],
-    ) -> Option<&'a T> {
+    ) -> Option<&'a (PathBuf, T)> {
 
     dirs.iter()
         .find(|(dir, _)| file.starts_with(dir))
-        .map(|(_, v)| v)
+        //.map(|(_, v)| v)
 }
 
 /// ------------------------------------------------------------
@@ -162,8 +177,8 @@ fn main() -> Result<()> {
         };
 
         if let Some(value) = value_for_path(&file, &handler_locations) {
-            let handler = get_adapter(&value)?;
-            output.file_list=handler.list_items();
+            let handler = get_adapter( &(value.1))?;
+            output.file_list=handler.list_low_quality(&value.0,&file);
             output.command_success=true;
         } else {
         }
