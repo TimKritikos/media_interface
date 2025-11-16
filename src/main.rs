@@ -57,7 +57,7 @@ struct SourceMediaEntry {
 /// ------------------------------------------------------------
 
 trait SourceMediaAdapter {
-    fn list_low_quality(&self, source_media_location: &PathBuf, source_media_card: &PathBuf) -> Vec<FileItem>;
+    fn list_low_quality(&self, source_media_location: &PathBuf, source_media_card: &PathBuf) -> Option<Vec<FileItem>>;
 }
 
 struct GoProAdapter;
@@ -65,7 +65,7 @@ struct SonyAdapter;
 
 /// For GoPro: top-level directory, all files mixed — just use generic grouping
 impl SourceMediaAdapter for GoProAdapter {
-    fn list_low_quality(&self,  _source_media_location: &PathBuf,  source_media_card: &PathBuf) -> Vec<FileItem> {
+    fn list_low_quality(&self,  _source_media_location: &PathBuf,  source_media_card: &PathBuf) -> Option<Vec<FileItem>> {
         let mut ret: Vec<FileItem> = Vec::<FileItem>::new();
 
         let paths = fs::read_dir(source_media_card).unwrap();
@@ -73,11 +73,14 @@ impl SourceMediaAdapter for GoProAdapter {
         for path in paths {
             if let Some(name) = path.unwrap().path().file_name().and_then(|n| n.to_str()) {
                 if name.ends_with(".THM") {
-                    ret.push(FileItem{
-                        file_path:name.to_string(),
-                        file_type:"image".to_string(),
-                        item_type:"video".to_string()
-                    });
+                    let part_id = name.get(2..4)?.parse::<u32>().ok();
+                    if part_id == Some(1) {
+                        ret.push(FileItem{
+                            file_path:name.to_string(),
+                            file_type:"image".to_string(),
+                            item_type:"video".to_string()
+                        });
+                    }
                 }else if name.ends_with(".JPG") {
                     ret.push(FileItem{
                         file_path:name.to_string(),
@@ -87,14 +90,14 @@ impl SourceMediaAdapter for GoProAdapter {
                 }
             }
         }
-        return ret
+        return Some(ret)
     }
 }
 
 /// For Sony: handle DCIM & PRIVATE/M4ROOT with custom subfolders
 impl SourceMediaAdapter for SonyAdapter {
-    fn list_low_quality(&self,  _source_media_location: &PathBuf,  _source_media_card: &PathBuf ) -> Vec<FileItem> {
-        return Vec::<FileItem>::new();
+    fn list_low_quality(&self,  _source_media_location: &PathBuf,  _source_media_card: &PathBuf ) -> Option<Vec<FileItem>> {
+        return Some(Vec::<FileItem>::new());
     }
 }
 
@@ -178,8 +181,10 @@ fn main() -> Result<()> {
 
         if let Some(value) = value_for_path(&file, &handler_locations) {
             let handler = get_adapter( &(value.1))?;
-            output.file_list=handler.list_low_quality(&value.0,&file);
-            output.command_success=true;
+            if let Some(file_list) =handler.list_low_quality(&value.0,&file) {
+                output.file_list=file_list;
+                output.command_success=true;
+            }
         } else {
         }
     }
