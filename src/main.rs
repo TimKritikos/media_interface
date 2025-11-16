@@ -80,6 +80,8 @@ impl SourceMediaAdapter for GoProAdapter {
                             file_type:"image".to_string(),
                             item_type:"video".to_string()
                         });
+                    }else{
+                        eprintln!("WARNING: Unable to parse file {}", name);
                     }
                 }else if name.ends_with(".JPG") {
                     ret.push(FileItem{
@@ -88,6 +90,8 @@ impl SourceMediaAdapter for GoProAdapter {
                         item_type:"image".to_string()
                     });
                 }
+            }else{
+                return None
             }
         }
         return Some(ret)
@@ -125,7 +129,7 @@ fn value_for_path<'a, T>(
 /// ------------------------------------------------------------
 
 #[derive(Serialize, Deserialize)]
-struct fail_json_output {
+struct FailJsonOutput {
     data_type: &'static str,
     version: &'static str,
     command_success: bool,
@@ -151,18 +155,17 @@ fn main() -> Result<()> {
     let mut handler_locations: Vec<(PathBuf, String)> = Vec::new();
 
     for cam in cfg.source_media {
-        let path: PathBuf = match fs::canonicalize(cam.path.join(cam.card_subdir)) {
+        let path: PathBuf = match fs::canonicalize(cam.path.join(&cam.card_subdir)) {
             Ok(p) => p,
             Err(e) => {
-                eprintln!("Error: {}", e);
-                return Ok(());
+                return Err(anyhow::anyhow!("Error reading source media dir {:?}: {}", cam.path.join(cam.card_subdir), e));
             }
         };
 
         handler_locations.push((path,cam.handler));
     }
 
-    let mut output = fail_json_output{
+    let mut output = FailJsonOutput{
         data_type: "source_media_interface_api",
         version: env!("CARGO_PKG_VERSION"),
         command_success: false,
@@ -174,19 +177,27 @@ fn main() -> Result<()> {
         let file: PathBuf = match fs::canonicalize(path) {
             Ok(p) => p,
             Err(e) => {
-                eprintln!("Error: {}", e);
-                return Ok(());
+                return Err(anyhow::anyhow!("Error finding the absolute path of input file: {}",e));
             }
         };
 
-        if let Some(value) = value_for_path(&file, &handler_locations) {
-            let handler = get_adapter( &(value.1))?;
-            if let Some(file_list) =handler.list_low_quality(&value.0,&file) {
-                output.file_list=file_list;
-                output.command_success=true;
-            }
-        } else {
-        }
+        let value : &(PathBuf, String) = match value_for_path(&file, &handler_locations) {
+            Some(p) => p,
+            None => {return Err(anyhow::anyhow!("Couldn't find handler responsible for a dir in the path of the input file"))}
+        };
+        let handler = get_adapter( &(value.1))?;
+        let file_list = match handler.list_low_quality(&value.0,&file) {
+            Some(p) => p,
+            None => {return Err(anyhow::anyhow!("Error creating list of files"))}
+        };
+        output.file_list=file_list;
+        output.command_success=true;
+    }else if let Some(_path_buf) = cli.high_quality_list.as_ref(){
+
+    }else if let Some(_path_buf) = cli.get_related.as_ref(){
+
+    }else{
+        return Err(anyhow::anyhow!("Internal error: no action selected"));
     }
 
     // Emit everything as JSON to stdout
