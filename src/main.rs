@@ -1,9 +1,7 @@
 use anyhow::{Context, Result};
 use clap::{Parser, ArgGroup};
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
 use std::fs;
 
 /// ------------------------------------------------------------
@@ -57,7 +55,8 @@ struct SourceMediaEntry {
 /// ------------------------------------------------------------
 
 trait SourceMediaAdapter {
-    fn list_low_quality(&self, source_media_location: &PathBuf, source_media_card: &PathBuf) -> Option<Vec<FileItem>>;
+    fn list_low_quality(&self, source_media_location: &PathBuf, source_media_card: &PathBuf) -> Result<Vec<FileItem>>;
+    fn name(&self) -> String;
 }
 
 struct GoProAdapter;
@@ -65,16 +64,17 @@ struct SonyAdapter;
 
 /// For GoPro: top-level directory, all files mixed — just use generic grouping
 impl SourceMediaAdapter for GoProAdapter {
-    fn list_low_quality(&self,  _source_media_location: &PathBuf,  source_media_card: &PathBuf) -> Option<Vec<FileItem>> {
+    fn list_low_quality(&self,  _source_media_location: &PathBuf,  source_media_card: &PathBuf) -> Result<Vec<FileItem>> {
         let mut ret: Vec<FileItem> = Vec::<FileItem>::new();
 
-        let paths = fs::read_dir(source_media_card).unwrap();
-
-        for path in paths {
+        for path in fs::read_dir(source_media_card).unwrap(){
             if let Some(name) = path.unwrap().path().file_name().and_then(|n| n.to_str()) {
                 if name.ends_with(".THM") {
-                    let part_id = name.get(2..4)?.parse::<u32>().ok();
-                    if part_id == Some(1) {
+                    let part_id = match name.get(2..4).unwrap().parse::<u32>() {
+                        Ok(p) => p,
+                        Err(e) => { return Err(anyhow::anyhow!("Error parsing filename: {}",e)); }
+                    };
+                    if part_id == 1 {
                         ret.push(FileItem{
                             file_path:name.to_string(),
                             file_type:"image".to_string(),
@@ -91,17 +91,23 @@ impl SourceMediaAdapter for GoProAdapter {
                     });
                 }
             }else{
-                return None
+                return Err(anyhow::anyhow!("Unknown error in traversin directory"));
             }
         }
-        return Some(ret)
+        return Ok(ret)
+    }
+    fn name(&self) -> String {
+        return "GoPro-Generic-1".to_string()
     }
 }
 
 /// For Sony: handle DCIM & PRIVATE/M4ROOT with custom subfolders
 impl SourceMediaAdapter for SonyAdapter {
-    fn list_low_quality(&self,  _source_media_location: &PathBuf,  _source_media_card: &PathBuf ) -> Option<Vec<FileItem>> {
-        return Some(Vec::<FileItem>::new());
+    fn list_low_quality(&self,  _source_media_location: &PathBuf,  _source_media_card: &PathBuf ) -> Result<Vec<FileItem>> {
+        return Err(anyhow::anyhow!("Not implemented"))
+    }
+    fn name(&self) -> String {
+        return "Sony-ILCEM4-1".to_string()
     }
 }
 
@@ -109,7 +115,7 @@ impl SourceMediaAdapter for SonyAdapter {
 fn get_adapter(t: &str) -> Result<Box<dyn SourceMediaAdapter>> {
     Ok(match t {
         "GoPro-Generic-1" => Box::new(GoProAdapter),
-        "Sony-ILCEM4" => Box::new(SonyAdapter),
+        "Sony-ILCEM4-1" => Box::new(SonyAdapter),
         unknown  => anyhow::bail!("Unknown camera type: {}", unknown)
     })
 }
@@ -121,7 +127,6 @@ fn value_for_path<'a, T>(
 
     dirs.iter()
         .find(|(dir, _)| file.starts_with(dir))
-        //.map(|(_, v)| v)
 }
 
 /// ------------------------------------------------------------
@@ -157,9 +162,7 @@ fn main() -> Result<()> {
     for cam in cfg.source_media {
         let path: PathBuf = match fs::canonicalize(cam.path.join(&cam.card_subdir)) {
             Ok(p) => p,
-            Err(e) => {
-                return Err(anyhow::anyhow!("Error reading source media dir {:?}: {}", cam.path.join(cam.card_subdir), e));
-            }
+            Err(e) => { return Err(anyhow::anyhow!("Error reading source media dir {:?}: {}", cam.path.join(cam.card_subdir), e)); }
         };
 
         handler_locations.push((path,cam.handler));
@@ -176,19 +179,17 @@ fn main() -> Result<()> {
         let path: &Path = path_buf.as_ref();
         let file: PathBuf = match fs::canonicalize(path) {
             Ok(p) => p,
-            Err(e) => {
-                return Err(anyhow::anyhow!("Error finding the absolute path of input file: {}",e));
-            }
+            Err(e) => { return Err(anyhow::anyhow!("Error finding the absolute path of input file: {}",e)); }
         };
 
         let value : &(PathBuf, String) = match value_for_path(&file, &handler_locations) {
             Some(p) => p,
-            None => {return Err(anyhow::anyhow!("Couldn't find handler responsible for a dir in the path of the input file"))}
+            None => { return Err(anyhow::anyhow!("Couldn't find handler responsible for a dir in the path of the input file")) }
         };
         let handler = get_adapter( &(value.1))?;
         let file_list = match handler.list_low_quality(&value.0,&file) {
-            Some(p) => p,
-            None => {return Err(anyhow::anyhow!("Error creating list of files"))}
+            Ok(p) => p,
+            Err(e) => { return Err(anyhow::anyhow!("handler {}: {}",handler.name(),e)) }
         };
         output.file_list=file_list;
         output.command_success=true;

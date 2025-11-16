@@ -7,7 +7,7 @@
 		},{
 			"path": "Sony_SN:234",
 			"card_subdir":"DATA",
-			"handler": "Sony-ILCEM4"
+			"handler": "Sony-ILCEM4-1"
 		}
 	]
 }
