@@ -67,7 +67,12 @@ impl SourceMediaAdapter for GoProAdapter {
     fn list_low_quality(&self,  _source_media_location: &PathBuf,  source_media_card: &PathBuf) -> Result<Vec<FileItem>> {
         let mut ret: Vec<FileItem> = Vec::<FileItem>::new();
 
-        for path in fs::read_dir(source_media_card).unwrap(){
+        let paths = match fs::read_dir(source_media_card) {
+            Ok(p) => p,
+            Err(e) => { return Err(anyhow::anyhow!("Error opening provided card dir: {}", e))}
+        };
+
+        for path in paths{
             if let Some(name) = path.unwrap().path().file_name().and_then(|n| n.to_str()) {
                 if name.ends_with(".THM") {
                     let part_id = match name.get(2..4).unwrap().parse::<u32>() {
@@ -138,7 +143,10 @@ struct FailJsonOutput {
     data_type: &'static str,
     version: &'static str,
     command_success: bool,
-    file_list: Vec<FileItem>
+    #[serde(skip_serializing_if = "Option::is_none")]
+    file_list: Option<Vec<FileItem>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error_string: Option<String>
 }
 
 #[derive(Serialize, Deserialize)]
@@ -147,8 +155,21 @@ struct FileItem {
     file_type: String,
     item_type: String
 }
-
+fn fail_main( mut data: FailJsonOutput, error: String ) -> Result<()> {
+    data.error_string=Some(error.clone());
+    data.file_list=None;
+    println!("{}", serde_json::to_string(&data)?);
+    return Err(anyhow::anyhow!("{}", error));
+}
 fn main() -> Result<()> {
+    let mut output = FailJsonOutput{
+        data_type: "source_media_interface_api",
+        version: env!("CARGO_PKG_VERSION"),
+        command_success: false,
+        file_list: None,
+        error_string: Some("Uninitialised error message".to_string())
+    };
+
     let cli = Cli::parse();
 
     // Load config file
@@ -162,48 +183,42 @@ fn main() -> Result<()> {
     for cam in cfg.source_media {
         let path: PathBuf = match fs::canonicalize(cam.path.join(&cam.card_subdir)) {
             Ok(p) => p,
-            Err(e) => { return Err(anyhow::anyhow!("Error reading source media dir {:?}: {}", cam.path.join(cam.card_subdir), e)); }
+            Err(e) => { return fail_main(output, format!("Error reading source media dir {:?}: {}", cam.path.join(cam.card_subdir), e))}
         };
-
         handler_locations.push((path,cam.handler));
     }
 
-    let mut output = FailJsonOutput{
-        data_type: "source_media_interface_api",
-        version: env!("CARGO_PKG_VERSION"),
-        command_success: false,
-        file_list: Vec::<FileItem>::new()
-    };
 
     if let Some(path_buf) = cli.low_quality_list.as_ref() {
         let path: &Path = path_buf.as_ref();
         let file: PathBuf = match fs::canonicalize(path) {
             Ok(p) => p,
-            Err(e) => { return Err(anyhow::anyhow!("Error finding the absolute path of input file: {}",e)); }
+            Err(e) => { return fail_main(output, format!("error finding the absolute path of input file: {}",e)); }
         };
 
         let value : &(PathBuf, String) = match value_for_path(&file, &handler_locations) {
             Some(p) => p,
-            None => { return Err(anyhow::anyhow!("Couldn't find handler responsible for a dir in the path of the input file")) }
+            None => { return fail_main(output,format!("Couldn't find handler responsible for a dir in the path of the input file")) }
         };
         let handler = get_adapter( &(value.1))?;
-        let file_list = match handler.list_low_quality(&value.0,&file) {
-            Ok(p) => p,
-            Err(e) => { return Err(anyhow::anyhow!("handler {}: {}",handler.name(),e)) }
+        match handler.list_low_quality(&value.0,&file) {
+            Ok(p) => {
+                output.file_list=Some(p);
+            }
+            Err(e) => { return fail_main(output, format!("handler {}: {}",handler.name(),e)); }
         };
-        output.file_list=file_list;
         output.command_success=true;
+        output.error_string=None;
     }else if let Some(_path_buf) = cli.high_quality_list.as_ref(){
 
     }else if let Some(_path_buf) = cli.get_related.as_ref(){
 
     }else{
-        return Err(anyhow::anyhow!("Internal error: no action selected"));
+        return fail_main(output, "Internal error: no action selected".to_string());
     }
 
     // Emit everything as JSON to stdout
-    let json = serde_json::to_string(&output)?;
-    println!("{}", json);
+    println!("{}", serde_json::to_string(&output)?);
 
     Ok(())
 }
