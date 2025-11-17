@@ -12,7 +12,7 @@ use std::fs;
 #[command(group(
     ArgGroup::new("action")
         .required(true)
-        .args(&["low_quality_list", "high_quality_list", "get_related"])
+        .args(&["list_thumbnail", "list_high_quality", "get_related"])
 ))]
 struct Cli {
     /// Path to config json file. If none is supplied, a file named "interface_config.json" in the
@@ -23,12 +23,12 @@ struct Cli {
     /// Print a JSON object with a list of files and info representing items under the given
     /// directory, prefering the lowest quality representation of the item
     #[arg(short='l', long="list-thumbnail", value_name="dir path" )]
-    low_quality_list: Option<PathBuf>,
+    list_thumbnail: Option<PathBuf>,
 
     /// Print a JSON object with a list of files and info representing items under the given
     /// directory, prefering the highest quality representation of the item
     #[arg(short='L', long="list-high-quality", value_name="dir path")]
-    high_quality_list: Option<PathBuf>,
+    list_high_quality: Option<PathBuf>,
 
     /// Given a file this will output a JSON object with a list of all files in the item that
     /// represent the file
@@ -125,7 +125,7 @@ where
 /// ------------------------------------------------------------
 
 trait SourceMediaAdapter {
-    fn list_low_quality(&self, source_media_location: &PathBuf, source_media_card: &PathBuf) -> Result<Vec<FileItem>>;
+    fn list_thumbnail(&self, source_media_location: &PathBuf, source_media_card: &PathBuf) -> Result<Vec<FileItem>>;
     fn name(&self) -> String;
 }
 
@@ -133,7 +133,7 @@ struct GoProAdapter;
 struct SonyAdapter;
 
 impl SourceMediaAdapter for GoProAdapter {
-    fn list_low_quality( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, ) -> Result<Vec<FileItem>> {
+    fn list_thumbnail( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, ) -> Result<Vec<FileItem>> {
         filter_top_level_dir(source_media_card.as_path(),|filename: &str, ext: Option<&str>, path: &str|{
             match ext {
                 Some("THM") => {
@@ -157,7 +157,7 @@ impl SourceMediaAdapter for GoProAdapter {
 
 /// For Sony: handle DCIM & PRIVATE/M4ROOT with custom subfolders
 impl SourceMediaAdapter for SonyAdapter {
-    fn list_low_quality(&self,  _source_media_location: &PathBuf,  _source_media_card: &PathBuf ) -> Result<Vec<FileItem>> {
+    fn list_thumbnail(&self,  _source_media_location: &PathBuf,  _source_media_card: &PathBuf ) -> Result<Vec<FileItem>> {
         return Err(anyhow::anyhow!("Not implemented"))
     }
     fn name(&self) -> String {
@@ -261,7 +261,7 @@ fn main() -> Result<()> {
     }
 
 
-    if let Some(path_buf) = cli.low_quality_list.as_ref() {
+    if let Some(path_buf) = cli.list_thumbnail.as_ref() {
         let path: &Path = path_buf.as_ref();
         let file: PathBuf = match fs::canonicalize(path) {
             Ok(p) => p,
@@ -273,7 +273,7 @@ fn main() -> Result<()> {
             None => { return fail_main(output,format!("Couldn't find handler responsible for a dir in the path of the input file")) }
         };
         let handler = get_adapter( &(value.1))?;
-        match handler.list_low_quality(&value.0,&file) {
+        match handler.list_thumbnail(&value.0,&file) {
             Ok(p) => {
                 output.file_list=Some(p);
             }
@@ -281,7 +281,7 @@ fn main() -> Result<()> {
         };
         output.command_success=true;
         output.error_string=None;
-    }else if let Some(_path_buf) = cli.high_quality_list.as_ref(){
+    }else if let Some(_path_buf) = cli.list_high_quality.as_ref(){
 
     }else if let Some(_path_buf) = cli.get_related.as_ref(){
 
