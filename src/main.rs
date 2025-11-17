@@ -87,6 +87,20 @@ where
     Ok(())
 }
 
+fn create_simple_file(file_path:String, file_type:&str, item_type:&str) -> FileItem {
+    FileItem{
+        file_path:file_path,
+        file_type:file_type.to_string(),
+        item_type:item_type.to_string()
+    }
+}
+
+fn get_gopro_video_part_id(filename:String) -> Result<u8> {
+     return match filename.as_str().get(2..4).unwrap().parse::<u8>() {
+        Ok(p) => Ok(p),
+        Err(e) => { return Err(anyhow::anyhow!("Error parsing filename: {}",e)); }
+    };
+}
 
 /// ------------------------------------------------------------
 /// Camera adapters
@@ -102,35 +116,24 @@ struct SonyAdapter;
 
 /// For GoPro: top-level directory, all files mixed — just use generic grouping
 impl SourceMediaAdapter for GoProAdapter {
+
     fn list_low_quality(&self,  _source_media_location: &PathBuf,  source_media_card: &PathBuf) -> Result<Vec<FileItem>> {
         let mut ret: Vec<FileItem> = Vec::<FileItem>::new();
 
         return match for_each_file(source_media_card, |_path, filename: String, path_str: String, ext| -> Result<()> {
             match ext {
                 Some("THM") => {
-                    let part_id = match filename.as_str().get(2..4).unwrap().parse::<u32>() {
-                        Ok(p) => p,
-                        Err(e) => { return Err(anyhow::anyhow!("Error parsing filename: {}",e)); }
-                    };
-                    if part_id == 1 {
-                        ret.push(FileItem{
-                            file_path:path_str.to_string(),
-                            file_type:"image".to_string(),
-                            item_type:"video".to_string()
-                        });
+                    if get_gopro_video_part_id(filename)? == 1 {
+                        ret.push(create_simple_file(path_str,"image","video"));
                     }else{
-                        eprintln!("WARNING: Unable to parse file {}", path_str);
+                        return Err(anyhow::anyhow!("Unable to parse video id file {}", path_str));
                     }
                 },
                 Some("JPG") => {
-                    ret.push(FileItem{
-                        file_path:path_str.to_string(),
-                        file_type:"image".to_string(),
-                        item_type:"image".to_string()
-                    });
+                    ret.push(create_simple_file(path_str,"image","image"));
                 }
-                Some(_) => {}//println!("Other extension: {}", other),
-                None => {}//println!("No extension: {}", path_str),
+                Some("MP4") | Some("GPR") | Some("LRV") => {},
+                _ => { return Err(anyhow::anyhow!("Unexpected file {}", path_str))}
             }
             return Ok(());
         }) {
@@ -138,6 +141,7 @@ impl SourceMediaAdapter for GoProAdapter {
             Err(e) => Err(anyhow::anyhow!("Error in traversing directory: {}", e))
         };
     }
+
     fn name(&self) -> String {
         return "GoPro-Generic-1".to_string()
     }
