@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{Result};
 use clap::{Parser, ArgGroup};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -15,9 +15,10 @@ use std::fs;
         .args(&["low_quality_list", "high_quality_list", "get_related"])
 ))]
 struct Cli {
-    /// Path to config JSON
-    #[arg(short='c', long="config", required=true)]
-    config: PathBuf,
+    /// Path to config json file. If none is supplied, a file named "interface_config.json" in the
+    /// location of the executable is used.
+    #[arg(short='c', long="config")]
+    config: Option<PathBuf>,
 
     /// Print a JSON object with a list of files and info representing items under the given
     /// directory, prefering the lowest quality representation of the item
@@ -172,9 +173,26 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
+    let config_file_path = match cli.config {
+        Some(p) => p,
+        None => {
+            let invoked_path = PathBuf::from(env::args().next().unwrap());
+
+            let absolute_invoked_path = if invoked_path.is_absolute() {
+                invoked_path
+            } else {
+                env::current_dir().unwrap().join(invoked_path)
+            };
+
+            absolute_invoked_path.parent().unwrap().join(PathBuf::from("interface_config.json"))
+        }
+    };
+
     // Load config file
-    let data = std::fs::read_to_string(&cli.config)
-        .with_context(|| format!("Failed to read config file {:?}", cli.config))?;
+    let data = match std::fs::read_to_string(&config_file_path){
+        Ok(p) => p,
+        Err(e) =>  { return fail_main(output, format!("Failed to read config file {:?}: {}", config_file_path, e))}
+    };
 
     let cfg: Config = serde_json::from_str(&data)?;
 
