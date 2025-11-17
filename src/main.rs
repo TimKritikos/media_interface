@@ -41,6 +41,7 @@ struct Cli {
 /// ------------------------------------------------------------
 #[derive(Debug, Deserialize)]
 struct Config {
+    data_type: String,
     source_media: Vec<SourceMediaEntry>
 }
 
@@ -230,6 +231,10 @@ fn main() -> Result<()> {
     };
 
     let cfg: Config = serde_json::from_str(&data)?;
+
+    if cfg.data_type != "source_media_config" {
+        return fail_main(output, format!("Invalid data type on the config file: {}", cfg.data_type))
+    }
 
     let _ = env::set_current_dir(&config_file_path.parent().unwrap());
 

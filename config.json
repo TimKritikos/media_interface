@@ -1,4 +1,5 @@
 {
+	"data_type": "source_media_config",
 	"source_media": [
 		{
 			"path": "GoPro_SN:3142",
