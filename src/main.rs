@@ -3,6 +3,7 @@ use clap::{Parser, ArgGroup};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::fs;
+use std::process;
 
 /// ------------------------------------------------------------
 /// Command line interface
@@ -126,6 +127,7 @@ where
 
 trait SourceMediaAdapter {
     fn list_thumbnail(&self, source_media_location: &PathBuf, source_media_card: &PathBuf) -> Result<Vec<FileItem>>;
+    fn list_high_quality(&self, source_media_location: &PathBuf, source_media_card: &PathBuf) -> Result<Vec<FileItem>>;
     fn name(&self) -> String;
 }
 
@@ -149,6 +151,22 @@ impl SourceMediaAdapter for GoProAdapter {
             }
         })
     }
+    fn list_high_quality( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, ) -> Result<Vec<FileItem>> {
+        filter_top_level_dir(source_media_card.as_path(),|filename: &str, ext: Option<&str>, path: &str|{
+            match ext {
+                Some("MP4") => {
+                    if get_gopro_video_part_id(filename.to_string())? == 1 {
+                        Ok(Some(create_simple_file(path.to_string(), "image", "video")))
+                    } else {
+                        Err(anyhow::anyhow!("Unable to parse video id file {}",path))
+                    }
+                }
+                Some("JPG") => Ok(Some(create_simple_file(path.to_string(), "image", "image"))),
+                Some("THM") | Some("GPR") | Some("LRV") => Ok(None),
+                Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path)),
+            }
+        })
+    }
 
     fn name(&self) -> String {
         return "GoPro-Generic-1".to_string()
@@ -158,6 +176,9 @@ impl SourceMediaAdapter for GoProAdapter {
 /// For Sony: handle DCIM & PRIVATE/M4ROOT with custom subfolders
 impl SourceMediaAdapter for SonyAdapter {
     fn list_thumbnail(&self,  _source_media_location: &PathBuf,  _source_media_card: &PathBuf ) -> Result<Vec<FileItem>> {
+        return Err(anyhow::anyhow!("Not implemented"))
+    }
+    fn list_high_quality(&self,  _source_media_location: &PathBuf,  _source_media_card: &PathBuf ) -> Result<Vec<FileItem>> {
         return Err(anyhow::anyhow!("Not implemented"))
     }
     fn name(&self) -> String {
@@ -204,11 +225,12 @@ struct FileItem {
     file_type: String,
     item_type: String
 }
-fn fail_main( mut data: FailJsonOutput, error: String ) -> Result<()> {
+fn fail_main( data: &mut FailJsonOutput, error: String ) -> ! {
     data.error_string=Some(error.clone());
     data.file_list=None;
-    println!("{}", serde_json::to_string(&data)?);
-    return Err(anyhow::anyhow!("{}", error));
+    println!("{}", serde_json::to_string(&data).unwrap_or_else(|_| "Failed to serialise json".to_string()));
+    eprintln!("{}", error);
+    process::exit(1);
 }
 fn main() -> Result<()> {
     let mut output = FailJsonOutput{
@@ -237,15 +259,13 @@ fn main() -> Result<()> {
     };
 
     // Load config file
-    let data = match std::fs::read_to_string(&config_file_path){
-        Ok(p) => p,
-        Err(e) =>  { return fail_main(output, format!("Failed to read config file {:?}: {}", config_file_path, e))}
-    };
+    let data = std::fs::read_to_string(&config_file_path)
+        .unwrap_or_else(|e| fail_main(&mut output, format!("Failed to read config file {:?}: {}", config_file_path, e)));
 
     let cfg: Config = serde_json::from_str(&data)?;
 
     if cfg.data_type != "source_media_config" {
-        return fail_main(output, format!("Invalid data type on the config file: {}", cfg.data_type))
+        fail_main(&mut output, format!("Invalid data type on the config file: {}", cfg.data_type));
     }
 
     let _ = env::set_current_dir(&config_file_path.parent().unwrap());
@@ -253,40 +273,38 @@ fn main() -> Result<()> {
     let mut handler_locations: Vec<(PathBuf, String)> = Vec::new();
 
     for cam in cfg.source_media {
-        let path: PathBuf = match fs::canonicalize(cam.path.join(&cam.card_subdir)) {
-            Ok(p) => p,
-            Err(e) => { return fail_main(output, format!("Error reading source media dir {:?}: {}", cam.path.join(cam.card_subdir), e))}
-        };
+        let path: PathBuf = fs::canonicalize(cam.path.join(&cam.card_subdir))
+            .unwrap_or_else(|e| fail_main(&mut output, format!("Error reading source media dir {:?}: {}", cam.path.join(cam.card_subdir), e)));
         handler_locations.push((path,cam.handler));
     }
 
 
     if let Some(path_buf) = cli.list_thumbnail.as_ref() {
         let path: &Path = path_buf.as_ref();
-        let file: PathBuf = match fs::canonicalize(path) {
-            Ok(p) => p,
-            Err(e) => { return fail_main(output, format!("error finding the absolute path of input file: {}",e)); }
-        };
-
-        let value : &(PathBuf, String) = match value_for_path(&file, &handler_locations) {
-            Some(p) => p,
-            None => { return fail_main(output,format!("Couldn't find handler responsible for a dir in the path of the input file")) }
-        };
+        let file = fs::canonicalize(path)
+            .unwrap_or_else(|e| fail_main(&mut output, format!("error finding the absolute path of input file: {}", e)));
+        let value : &(PathBuf, String) =  value_for_path(&file, &handler_locations)
+            .unwrap_or_else(|| fail_main(&mut output,format!("Couldn't find handler responsible for a dir in the path of the input file")));
         let handler = get_adapter( &(value.1))?;
-        match handler.list_thumbnail(&value.0,&file) {
-            Ok(p) => {
-                output.file_list=Some(p);
-            }
-            Err(e) => { return fail_main(output, format!("handler {}: {}",handler.name(),e)); }
-        };
+        output.file_list = Some(handler.list_thumbnail(&value.0,&file)
+            .unwrap_or_else(|e| fail_main(&mut output, format!("handler {}: {}",handler.name(),e))));
         output.command_success=true;
         output.error_string=None;
-    }else if let Some(_path_buf) = cli.list_high_quality.as_ref(){
-
+    }else if let Some(path_buf) = cli.list_high_quality.as_ref(){
+        let path: &Path = path_buf.as_ref();
+        let file = fs::canonicalize(path)
+            .unwrap_or_else(|e| fail_main(&mut output, format!("error finding the absolute path of input file: {}", e)));
+        let value : &(PathBuf, String) =  value_for_path(&file, &handler_locations)
+            .unwrap_or_else(|| fail_main(&mut output,format!("Couldn't find handler responsible for a dir in the path of the input file")));
+        let handler = get_adapter( &(value.1))?;
+        output.file_list = Some(handler.list_high_quality(&value.0,&file)
+            .unwrap_or_else(|e| fail_main(&mut output, format!("handler {}: {}",handler.name(),e))));
+        output.command_success=true;
+        output.error_string=None;
     }else if let Some(_path_buf) = cli.get_related.as_ref(){
 
     }else{
-        return fail_main(output, "Internal error: no action selected".to_string());
+        fail_main(&mut output, "Internal error: no action selected".to_string());
     }
 
     // Emit everything as JSON to stdout
