@@ -52,6 +52,42 @@ struct SourceMediaEntry {
 }
 
 /// ------------------------------------------------------------
+/// Helper functions
+/// ------------------------------------------------------------
+
+fn for_each_file<F>(dir: &Path, mut f: F) -> Result<()>
+where
+    F: FnMut(&std::path::Path, String, String, Option<&str>) -> Result<()>,
+{
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str()); // Option<&str>
+
+        let path_str = path
+            .as_os_str()
+            .to_str()
+            .unwrap()
+            .to_string();
+
+        let filename = path
+            .file_name()
+            .unwrap()
+            .to_string_lossy().into_owned();
+
+        match f(&path, filename, path_str, ext){
+            Ok(()) => {},
+            Err(e) => { return Err(e); }
+        }
+    }
+    Ok(())
+}
+
+
+/// ------------------------------------------------------------
 /// Camera adapters
 /// ------------------------------------------------------------
 
@@ -68,39 +104,38 @@ impl SourceMediaAdapter for GoProAdapter {
     fn list_low_quality(&self,  _source_media_location: &PathBuf,  source_media_card: &PathBuf) -> Result<Vec<FileItem>> {
         let mut ret: Vec<FileItem> = Vec::<FileItem>::new();
 
-        let paths = match fs::read_dir(source_media_card) {
-            Ok(p) => p,
-            Err(e) => { return Err(anyhow::anyhow!("Error opening provided card dir: {}", e))}
-        };
-
-        for path in paths{
-            if let Some(name) = path.unwrap().path().file_name().and_then(|n| n.to_str()) {
-                if name.ends_with(".THM") {
-                    let part_id = match name.get(2..4).unwrap().parse::<u32>() {
+        return match for_each_file(source_media_card, |_path, filename: String, path_str: String, ext| -> Result<()> {
+            match ext {
+                Some("THM") => {
+                    let part_id = match filename.as_str().get(2..4).unwrap().parse::<u32>() {
                         Ok(p) => p,
                         Err(e) => { return Err(anyhow::anyhow!("Error parsing filename: {}",e)); }
                     };
                     if part_id == 1 {
                         ret.push(FileItem{
-                            file_path:name.to_string(),
+                            file_path:path_str.to_string(),
                             file_type:"image".to_string(),
                             item_type:"video".to_string()
                         });
                     }else{
-                        eprintln!("WARNING: Unable to parse file {}", name);
+                        eprintln!("WARNING: Unable to parse file {}", path_str);
                     }
-                }else if name.ends_with(".JPG") {
+                },
+                Some("JPG") => {
                     ret.push(FileItem{
-                        file_path:name.to_string(),
+                        file_path:path_str.to_string(),
                         file_type:"image".to_string(),
                         item_type:"image".to_string()
                     });
                 }
-            }else{
-                return Err(anyhow::anyhow!("Unknown error in traversin directory"));
+                Some(_) => {}//println!("Other extension: {}", other),
+                None => {}//println!("No extension: {}", path_str),
             }
-        }
-        return Ok(ret)
+            return Ok(());
+        }) {
+            Ok(()) => Ok(ret),
+            Err(e) => Err(anyhow::anyhow!("Error in traversing directory: {}", e))
+        };
     }
     fn name(&self) -> String {
         return "GoPro-Generic-1".to_string()
