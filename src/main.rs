@@ -173,7 +173,7 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    let config_file_path = match cli.config {
+    let config_file_path:PathBuf = match cli.config {
         Some(p) => p,
         None => {
             let invoked_path = PathBuf::from(env::args().next().unwrap());
@@ -195,6 +195,8 @@ fn main() -> Result<()> {
     };
 
     let cfg: Config = serde_json::from_str(&data)?;
+
+    let _ = env::set_current_dir(&config_file_path.parent().unwrap());
 
     let mut handler_locations: Vec<(PathBuf, String)> = Vec::new();
 
