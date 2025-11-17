@@ -56,7 +56,7 @@ struct SourceMediaEntry {
 /// Helper functions
 /// ------------------------------------------------------------
 
-fn for_each_file<F>(dir: &Path, mut f: F) -> Result<()>
+fn for_each_file_type<F>(dir: &Path, mut f: F) -> Result<()>
 where
     F: FnMut(&std::path::Path, String, String, Option<&str>) -> Result<()>,
 {
@@ -102,6 +102,24 @@ fn get_gopro_video_part_id(filename:String) -> Result<u8> {
     };
 }
 
+fn filter_top_level_dir<F>(source_dir: &Path, mut filter: F) -> Result<Vec<FileItem>>
+where
+    F:FnMut(&str, Option<&str>, &str)->Result<Option<FileItem>>,
+{
+    let mut items = Vec::<FileItem>::new();
+
+    for_each_file_type(source_dir, |_path:&Path, filename: String, path_str: String, ext: Option<&str>| {
+        if let Some(item) = filter(&filename, ext, &path_str)? {
+            items.push(item);
+        }
+        Ok(())
+    })
+    .map_err(|err| anyhow::anyhow!("Error traversing directory: {}", err))?;
+
+    Ok(items)
+}
+
+
 /// ------------------------------------------------------------
 /// Camera adapters
 /// ------------------------------------------------------------
@@ -114,32 +132,22 @@ trait SourceMediaAdapter {
 struct GoProAdapter;
 struct SonyAdapter;
 
-/// For GoPro: top-level directory, all files mixed — just use generic grouping
 impl SourceMediaAdapter for GoProAdapter {
-
-    fn list_low_quality(&self,  _source_media_location: &PathBuf,  source_media_card: &PathBuf) -> Result<Vec<FileItem>> {
-        let mut ret: Vec<FileItem> = Vec::<FileItem>::new();
-
-        return match for_each_file(source_media_card, |_path, filename: String, path_str: String, ext| -> Result<()> {
+    fn list_low_quality( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, ) -> Result<Vec<FileItem>> {
+        filter_top_level_dir(source_media_card.as_path(),|filename: &str, ext: Option<&str>, path: &str|{
             match ext {
                 Some("THM") => {
-                    if get_gopro_video_part_id(filename)? == 1 {
-                        ret.push(create_simple_file(path_str,"image","video"));
-                    }else{
-                        return Err(anyhow::anyhow!("Unable to parse video id file {}", path_str));
+                    if get_gopro_video_part_id(filename.to_string())? == 1 {
+                        Ok(Some(create_simple_file(path.to_string(), "image", "video")))
+                    } else {
+                        Err(anyhow::anyhow!("Unable to parse video id file {}",path))
                     }
-                },
-                Some("JPG") => {
-                    ret.push(create_simple_file(path_str,"image","image"));
                 }
-                Some("MP4") | Some("GPR") | Some("LRV") => {},
-                _ => { return Err(anyhow::anyhow!("Unexpected file {}", path_str))}
+                Some("JPG") => Ok(Some(create_simple_file(path.to_string(), "image", "image"))),
+                Some("MP4") | Some("GPR") | Some("LRV") => Ok(None),
+                Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path)),
             }
-            return Ok(());
-        }) {
-            Ok(()) => Ok(ret),
-            Err(e) => Err(anyhow::anyhow!("Error in traversing directory: {}", e))
-        };
+        })
     }
 
     fn name(&self) -> String {
