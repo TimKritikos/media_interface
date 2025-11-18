@@ -4,7 +4,7 @@
 		{
 			"path": "GoPro_SN:3142",
 			"card_subdir":"DATA",
-			"handler": "GoPro-Generic-1"
+			"handler": "GoPro-Hero-Generic-1"
 		},{
 			"path": "Sony_SN:234",
 			"card_subdir":"DATA",

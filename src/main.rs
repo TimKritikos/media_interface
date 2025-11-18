@@ -2,8 +2,12 @@ use anyhow::{Result};
 use clap::{Parser, ArgGroup};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use std::fs;
 use std::process;
+use std::fs;
+
+mod gopro_hero_generic_1;
+mod sony_ilcem4_1;
+mod helpers;
 
 /// ------------------------------------------------------------
 /// Command line interface
@@ -53,141 +57,10 @@ struct SourceMediaEntry {
     path: PathBuf,
 }
 
-/// ------------------------------------------------------------
-/// Helper functions
-/// ------------------------------------------------------------
-
-fn for_each_file_type<F>(dir: &Path, mut f: F) -> Result<()>
-where
-    F: FnMut(&std::path::Path, String, String, Option<&str>) -> Result<()>,
-{
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str()); // Option<&str>
-
-        let path_str = path
-            .as_os_str()
-            .to_str()
-            .unwrap()
-            .to_string();
-
-        let filename = path
-            .file_name()
-            .unwrap()
-            .to_string_lossy().into_owned();
-
-        match f(&path, filename, path_str, ext){
-            Ok(()) => {},
-            Err(e) => { return Err(e); }
-        }
-    }
-    Ok(())
-}
-
-fn create_simple_file(file_path:String, file_type:&str, item_type:&str) -> FileItem {
-    FileItem{
-        file_path:file_path,
-        file_type:file_type.to_string(),
-        item_type:item_type.to_string(),
-        part_count:None,
-        part_num:None,
-    }
-}
-fn create_part_file(file_path:String, file_type:&str, item_type:&str, part_count:u8, part_num:u8) -> FileItem {
-    FileItem{
-        file_path:file_path,
-        file_type:file_type.to_string(),
-        item_type:item_type.to_string(),
-        part_count:Some(part_count),
-        part_num:Some(part_num),
-    }
-}
-
-fn get_gopro_video_part_id(filename:String) -> Result<u8> {
-     return match filename.as_str().get(2..4).unwrap().parse::<u8>() {
-        Ok(p) => Ok(p),
-        Err(e) => { return Err(anyhow::anyhow!("Error parsing filename: {}",e)); }
-    };
-}
-
-enum GoProVideoFileType{
-    LowBitrateVideo,
-    HighBitrateVideo,
-    WavAudio,
-    ThumbnailPhoto,
-}
-
-enum GoProPhotoFileType{
-    JpegPhoto,
-    RawPhoto,
-}
-
-fn create_gopro_photo_filename(input_filename:String, file_type: GoProPhotoFileType ) -> Option<String> {
-    let (name, _) = input_filename.rsplit_once('.')?;
-    if name.len() < 1 { // minimal length, GX/L + NN + One character media id
-        return None;
-    }
-    let new_extension = match file_type {
-        GoProPhotoFileType::JpegPhoto => "JPG",
-        GoProPhotoFileType::RawPhoto => "GPR",
-    };
-    Some(format!("{name}.{new_extension}"))
-}
-
-fn create_gopro_video_filename(input_filename:String, part:u8, file_type: GoProVideoFileType ) -> Option<String> {
-    let (name, _) = input_filename.rsplit_once('.')?;
-
-    if name.len() < 5 { // minimal length, GX/L + NN + One character media id
-        return None;
-    }
-
-    let media_id = &name[4..];
-
-    let new_prefix = match file_type {
-        GoProVideoFileType::LowBitrateVideo => "GL",
-        GoProVideoFileType::HighBitrateVideo => "GX",
-        GoProVideoFileType::WavAudio => "GX",
-        GoProVideoFileType::ThumbnailPhoto => "GX",
-    };
-
-    let new_part = format!("{:02}", part);
-
-    let new_extension = match file_type {
-        GoProVideoFileType::LowBitrateVideo => "LRV",
-        GoProVideoFileType::HighBitrateVideo => "MP4",
-        GoProVideoFileType::WavAudio => "WAV",
-        GoProVideoFileType::ThumbnailPhoto => "THM",
-    };
-
-    Some(format!("{new_prefix}{new_part}{media_id}.{new_extension}"))
-}
-
-fn filter_top_level_dir<F>(source_dir: &Path, mut filter: F) -> Result<Vec<FileItem>>
-where
-    F:FnMut(&str, Option<&str>, &str)->Result<Option<FileItem>>,
-{
-    let mut items = Vec::<FileItem>::new();
-
-    for_each_file_type(source_dir, |_path:&Path, filename: String, path_str: String, ext: Option<&str>| {
-        if let Some(item) = filter(&filename, ext, &path_str)? {
-            items.push(item);
-        }
-        Ok(())
-    })
-    .map_err(|err| anyhow::anyhow!("Error traversing directory: {}", err))?;
-
-    Ok(items)
-}
-
 
 /// ------------------------------------------------------------
-/// Camera adapters
+/// Source media adapters
 /// ------------------------------------------------------------
-
 trait SourceMediaAdapter {
     fn list_thumbnail(&self, source_media_location: &PathBuf, source_media_card: &PathBuf) -> Result<Vec<FileItem>>;
     fn list_high_quality(&self, source_media_location: &PathBuf, source_media_card: &PathBuf) -> Result<Vec<FileItem>>;
@@ -195,138 +68,11 @@ trait SourceMediaAdapter {
     fn name(&self) -> String;
 }
 
-struct GoProAdapter;
-struct SonyAdapter;
 
-impl SourceMediaAdapter for GoProAdapter {
-    fn list_thumbnail( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, ) -> Result<Vec<FileItem>> {
-        filter_top_level_dir(source_media_card.as_path(),|filename: &str, ext: Option<&str>, path: &str|{
-            match ext {
-                Some("THM") => {
-                    if get_gopro_video_part_id(filename.to_string())? == 1 {
-                        Ok(Some(create_simple_file(path.to_string(), "image", "video")))
-                    } else {
-                        Err(anyhow::anyhow!("Unable to parse video id file {}",path))
-                    }
-                }
-                Some("JPG") => Ok(Some(create_simple_file(path.to_string(), "image", "image"))),
-                Some("MP4") | Some("GPR") | Some("LRV") => Ok(None),
-                Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path)),
-            }
-        })
-    }
-    fn list_high_quality( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, ) -> Result<Vec<FileItem>> {
-        filter_top_level_dir(source_media_card.as_path(),|filename: &str, ext: Option<&str>, path: &str|{
-            match ext {
-                Some("MP4") => {
-                    if get_gopro_video_part_id(filename.to_string())? == 1 {
-                        Ok(Some(create_simple_file(path.to_string(), "image", "video")))
-                    } else {
-                        Err(anyhow::anyhow!("Unable to parse video id file {}",path))
-                    }
-                }
-                Some("JPG") => Ok(Some(create_simple_file(path.to_string(), "image", "image"))),
-                Some("THM") | Some("GPR") | Some("LRV") => Ok(None),
-                Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path)),
-            }
-        })
-    }
-    fn get_related(&self, _source_media_location: &PathBuf, source_media_file: &PathBuf) -> Result<Vec<FileItem>>{
-        let mut items = Vec::<FileItem>::new();
-
-        let path = source_media_file.as_path();
-
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str());
-
-        match ext {
-            Some("THM")|Some("MP4")|Some("WAV")|Some("LRV") => {
-                let mut part_count:u8 = 0;
-                //Get part count
-                for part in 1..=99 {
-                    let test_file_path=source_media_file.parent().unwrap().join(create_gopro_video_filename(path.file_name().unwrap().to_string_lossy().into_owned(),part,GoProVideoFileType::HighBitrateVideo).unwrap());
-                    if test_file_path.exists(){
-                        part_count+=1;
-                    }else{
-                        if part==1{
-                            return Err(anyhow::anyhow!("Iniital video file not found"));
-                        }else{
-                            break;
-                        }
-                    }
-                }
-
-                for part in 1..=part_count {
-                    //TODO: Maybe emove the check and calculations for the first one
-                    let test_file_path=source_media_file.parent().unwrap().join(create_gopro_video_filename(path.file_name().unwrap().to_string_lossy().into_owned(),part,GoProVideoFileType::HighBitrateVideo).unwrap());
-                    if !test_file_path.exists(){
-                            return Err(anyhow::anyhow!("MP4 file that got found later could not be reopened. This should never happen"))
-                    }
-                    items.push(create_part_file(test_file_path.to_string_lossy().into_owned(),"video","video",part_count,part));
-
-                    let lrv_filename=source_media_file.parent().unwrap().join(create_gopro_video_filename(path.file_name().unwrap().to_string_lossy().into_owned(),part,GoProVideoFileType::LowBitrateVideo).unwrap());
-                    if !lrv_filename.exists(){
-                        return Err(anyhow::anyhow!("MP4 file found but not the related LRV"))
-                    }
-                    items.push(create_part_file(lrv_filename.to_string_lossy().into_owned(),"video-preview","video",part_count,part));
-
-                    let thm_filename=source_media_file.parent().unwrap().join(create_gopro_video_filename(path.file_name().unwrap().to_string_lossy().into_owned(),part,GoProVideoFileType::ThumbnailPhoto).unwrap());
-                    if !thm_filename.exists(){
-                        return Err(anyhow::anyhow!("MP4 file found but not the related THM"))
-                    }
-                    items.push(create_part_file(thm_filename.to_string_lossy().into_owned(),"photo-preview","video",part_count,part));
-
-                    let wav_filename=source_media_file.parent().unwrap().join(create_gopro_video_filename(path.file_name().unwrap().to_string_lossy().into_owned(),part,GoProVideoFileType::WavAudio).unwrap());
-                    if wav_filename.exists(){
-                        items.push(create_part_file(wav_filename.to_string_lossy().into_owned(),"audio","video",part_count,part));
-                    }
-                }
-            },
-            Some("JPG")|Some("GPR") => {
-                let jpeg_filename=source_media_file.parent().unwrap().join(create_gopro_photo_filename(path.file_name().unwrap().to_string_lossy().into_owned(),GoProPhotoFileType::JpegPhoto).unwrap());
-                if !jpeg_filename.exists(){
-                    return Err(anyhow::anyhow!("Jpeg photo not found"));
-                }
-                items.push(create_simple_file(jpeg_filename.to_string_lossy().into_owned(),"photo","photo"));
-
-                let gpr_filename=source_media_file.parent().unwrap().join(create_gopro_photo_filename(path.file_name().unwrap().to_string_lossy().into_owned(),GoProPhotoFileType::RawPhoto).unwrap());
-                if !gpr_filename.exists(){
-                    return Err(anyhow::anyhow!("raw GPR photo not found"));
-                }
-                items.push(create_simple_file(gpr_filename.to_string_lossy().into_owned(),"photo-raw","photo"));
-            }
-            _ => {return Err(anyhow::anyhow!("Invalid input file"));}
-        };
-        return Ok(items);
-    }
-
-    fn name(&self) -> String {
-        return "GoPro-Generic-1".to_string()
-    }
-}
-
-/// For Sony: handle DCIM & PRIVATE/M4ROOT with custom subfolders
-impl SourceMediaAdapter for SonyAdapter {
-    fn list_thumbnail(&self,  _source_media_location: &PathBuf,  _source_media_card: &PathBuf ) -> Result<Vec<FileItem>> {
-        return Err(anyhow::anyhow!("Not implemented"))
-    }
-    fn list_high_quality(&self,  _source_media_location: &PathBuf,  _source_media_card: &PathBuf ) -> Result<Vec<FileItem>> {
-        return Err(anyhow::anyhow!("Not implemented"))
-    }
-    fn get_related(&self, _source_media_location: &PathBuf, _source_media_file: &PathBuf) -> Result<Vec<FileItem>>{
-        return Err(anyhow::anyhow!("Not implemented"))
-    }
-    fn name(&self) -> String {
-        return "Sony-ILCEM4-1".to_string()
-    }
-}
-
-/// Map camera type string to actual adapter object
-fn get_adapter(t: &str) -> Result<Box<dyn SourceMediaAdapter>> {
+fn get_handler(t: &str) -> Result<Box<dyn SourceMediaAdapter>> {
     Ok(match t {
-        "GoPro-Generic-1" => Box::new(GoProAdapter),
-        "Sony-ILCEM4-1" => Box::new(SonyAdapter),
+        "GoPro-Hero-Generic-1" => Box::new(gopro_hero_generic_1::GoProAdapter),
+        "Sony-ILCEM4-1" => Box::new(sony_ilcem4_1::SonyAdapter),
         unknown  => anyhow::bail!("Unknown camera type: {}", unknown)
     })
 }
@@ -365,6 +111,7 @@ struct FileItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     part_num: Option<u8>,
 }
+
 fn fail_main( data: &mut FailJsonOutput, error: String ) -> ! {
     data.error_string=Some(error.clone());
     data.file_list=None;
@@ -372,6 +119,7 @@ fn fail_main( data: &mut FailJsonOutput, error: String ) -> ! {
     eprintln!("{}", error);
     process::exit(1);
 }
+
 fn main() -> Result<()> {
     let mut output = FailJsonOutput{
         data_type: "source_media_interface_api",
@@ -425,7 +173,7 @@ fn main() -> Result<()> {
             .unwrap_or_else(|e| fail_main(&mut output, format!("error finding the absolute path of input file: {}", e)));
         let value : &(PathBuf, String) =  value_for_path(&file, &handler_locations)
             .unwrap_or_else(|| fail_main(&mut output,format!("Couldn't find handler responsible for a dir in the path of the input file")));
-        let handler = get_adapter( &(value.1))?;
+        let handler = get_handler( &(value.1))?;
         output.file_list = Some(handler.list_thumbnail(&value.0,&file)
             .unwrap_or_else(|e| fail_main(&mut output, format!("handler {}: {}",handler.name(),e))));
         output.command_success=true;
@@ -436,7 +184,7 @@ fn main() -> Result<()> {
             .unwrap_or_else(|e| fail_main(&mut output, format!("error finding the absolute path of input file: {}", e)));
         let value : &(PathBuf, String) =  value_for_path(&file, &handler_locations)
             .unwrap_or_else(|| fail_main(&mut output,format!("Couldn't find handler responsible for a dir in the path of the input file")));
-        let handler = get_adapter( &(value.1))?;
+        let handler = get_handler( &(value.1))?;
         output.file_list = Some(handler.list_high_quality(&value.0,&file)
             .unwrap_or_else(|e| fail_main(&mut output, format!("handler {}: {}",handler.name(),e))));
         output.command_success=true;
@@ -447,7 +195,7 @@ fn main() -> Result<()> {
             .unwrap_or_else(|e| fail_main(&mut output, format!("error finding the absolute path of input file: {}", e)));
         let value : &(PathBuf, String) =  value_for_path(&file, &handler_locations)
             .unwrap_or_else(|| fail_main(&mut output,format!("Couldn't find handler responsible for a dir in the path of the input file")));
-        let handler = get_adapter( &(value.1))?;
+        let handler = get_handler( &(value.1))?;
         output.file_list = Some(handler.get_related(&value.0,&file)
             .unwrap_or_else(|e| fail_main(&mut output, format!("handler {}: {}",handler.name(),e))));
         output.command_success=true;
