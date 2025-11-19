@@ -9,9 +9,9 @@ mod gopro_hero_generic_1;
 mod sony_ilcem4_1;
 mod helpers;
 
-/// ------------------------------------------------------------
-/// Command line interface
-/// ------------------------------------------------------------
+/////////////////////////////////
+// Command line interface data //
+/////////////////////////////////
 #[derive(Parser)]
 #[clap(author, version, about)]
 #[command(group(
@@ -41,9 +41,9 @@ struct Cli {
     get_related: Option<PathBuf>,
 }
 
-/// ------------------------------------------------------------
-/// Config structures
-/// ------------------------------------------------------------
+//////////////////////
+// config file data //
+//////////////////////
 #[derive(Debug, Deserialize)]
 struct Config {
     data_type: String,
@@ -57,22 +57,20 @@ struct SourceMediaEntry {
     path: PathBuf,
 }
 
-
-/// ------------------------------------------------------------
-/// Source media adapters
-/// ------------------------------------------------------------
-trait SourceMediaAdapter {
+//////////////////
+// Handler data //
+//////////////////
+trait SourceMediaInterface {
     fn list_thumbnail(&self, source_media_location: &PathBuf, source_media_card: &PathBuf) -> Result<Vec<FileItem>>;
     fn list_high_quality(&self, source_media_location: &PathBuf, source_media_card: &PathBuf) -> Result<Vec<FileItem>>;
     fn get_related(&self, source_media_location: &PathBuf, source_media_file: &PathBuf) -> Result<Vec<FileItem>>;
     fn name(&self) -> String;
 }
 
-
-fn get_handler(t: &str) -> Result<Box<dyn SourceMediaAdapter>> {
+fn get_handler(t: &str) -> Result<Box<dyn SourceMediaInterface>> {
     Ok(match t {
-        "GoPro-Hero-Generic-1" => Box::new(gopro_hero_generic_1::GoProAdapter),
-        "Sony-ILCEM4-1" => Box::new(sony_ilcem4_1::SonyAdapter),
+        "GoPro-Hero-Generic-1" => Box::new(gopro_hero_generic_1::GoProInterface),
+        "Sony-ILCEM4-1" => Box::new(sony_ilcem4_1::SonyInterface),
         unknown  => anyhow::bail!("Unknown camera type: {}", unknown)
     })
 }
@@ -82,10 +80,9 @@ struct HandlerMapEntry{
     location: PathBuf,
 }
 
-/// ------------------------------------------------------------
-/// Main
-/// ------------------------------------------------------------
-
+////////////////////////////////
+// Output JSON structure data //
+////////////////////////////////
 #[derive(Serialize, Deserialize)]
 struct FailJsonOutput {
     data_type: &'static str,
@@ -108,6 +105,9 @@ struct FileItem {
     part_num: Option<u8>,
 }
 
+//////////
+// Main //
+//////////
 fn fail_main( data: &mut FailJsonOutput, error: String ) -> ! {
     data.error_string=Some(error.clone());
     data.file_list=None;
@@ -127,6 +127,7 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
+    //Get config file location
     let config_file_path:PathBuf = match cli.config {
         Some(p) => p,
         None => {
@@ -152,16 +153,18 @@ fn main() -> Result<()> {
         fail_main(&mut output, format!("Invalid data type on the config file: {}", cfg.data_type));
     }
 
+    // Set current dir to match relative paths in config
     let _ = env::set_current_dir(&config_file_path.parent().unwrap());
 
+    // Load handler data from config data
     let mut handlers: Vec<HandlerMapEntry> = Vec::new();
-
     for cam in cfg.source_media {
         let path: PathBuf = fs::canonicalize(cam.path.join(&cam.card_subdir))
             .unwrap_or_else(|e| fail_main(&mut output, format!("Error reading source media dir {:?}: {}", cam.path.join(cam.card_subdir), e)));
         handlers.push(HandlerMapEntry{location:path,name:cam.handler});
     }
 
+    // execute the appropriate code of the appropriate handler
     if let Some(input_file) = cli.list_thumbnail.as_ref() {
         handle_action_with_input(&mut output, input_file, handlers, |handler, base, file| handler.list_thumbnail(base, file));
     }else if let Some(input_file) = cli.list_high_quality.as_ref() {
@@ -172,14 +175,14 @@ fn main() -> Result<()> {
         fail_main(&mut output, "Internal error: no action selected".into());
     }
 
-    // Emit everything as JSON to stdout
+    // Output response from handler as json
     println!("{}", serde_json::to_string(&output)?);
 
     Ok(())
 }
 
 fn handle_action_with_input<F>( mut output: &mut FailJsonOutput, input_file: &PathBuf, handlers: Vec<HandlerMapEntry>, action: F, ) where
-    F: Fn(&dyn SourceMediaAdapter, &PathBuf, &PathBuf) -> Result<Vec<FileItem>>,
+    F: Fn(&dyn SourceMediaInterface, &PathBuf, &PathBuf) -> Result<Vec<FileItem>>,
 {
     let input_path = input_file.as_path();
 

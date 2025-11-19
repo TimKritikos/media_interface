@@ -1,5 +1,5 @@
 use anyhow::{Result};
-use crate::SourceMediaAdapter;
+use crate::SourceMediaInterface;
 use std::path::{PathBuf};
 use crate::helpers::*;
 use crate::FileItem;
@@ -73,13 +73,13 @@ fn create_gopro_video_file(input_file:&PathBuf, part:u8, file_type: GoProVideoFi
     Ok(input_file.parent().unwrap().join(format!("{new_prefix}{new_part}{media_id}.{new_extension}")))
 }
 
-pub struct GoProAdapter;
+pub struct GoProInterface;
 
 ////////////////////////////////////////
 //         File parsing code          //
 ////////////////////////////////////////
 
-impl SourceMediaAdapter for GoProAdapter {
+impl SourceMediaInterface for GoProInterface {
     fn list_thumbnail( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, ) -> Result<Vec<FileItem>> {
         filter_top_level_dir(source_media_card.as_path(),|filename: &str, ext: Option<&str>, path: &str|{
             match ext {

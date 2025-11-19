@@ -1,12 +1,12 @@
 use anyhow::{Result};
-use crate::SourceMediaAdapter;
+use crate::SourceMediaInterface;
 use std::path::{PathBuf};
 use crate::FileItem;
 
 
-pub struct SonyAdapter;
+pub struct SonyInterface;
 
-impl SourceMediaAdapter for SonyAdapter {
+impl SourceMediaInterface for SonyInterface {
     fn list_thumbnail(&self,  _source_media_location: &PathBuf,  _source_media_card: &PathBuf ) -> Result<Vec<FileItem>> {
         return Err(anyhow::anyhow!("Not implemented"))
     }
