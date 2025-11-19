@@ -77,7 +77,7 @@ fn get_handler(t: &str) -> Result<Box<dyn SourceMediaAdapter>> {
     })
 }
 
-fn value_for_path<'a, T>(
+fn get_handler_and_dir<'a, T>(
     file: &Path,
     dirs: &'a [(PathBuf, T)],
     ) -> Option<&'a (PathBuf, T)> {
@@ -158,50 +158,22 @@ fn main() -> Result<()> {
 
     let _ = env::set_current_dir(&config_file_path.parent().unwrap());
 
-    let mut handler_locations: Vec<(PathBuf, String)> = Vec::new();
+    let mut handlers: Vec<(PathBuf, String)> = Vec::new();
 
     for cam in cfg.source_media {
         let path: PathBuf = fs::canonicalize(cam.path.join(&cam.card_subdir))
             .unwrap_or_else(|e| fail_main(&mut output, format!("Error reading source media dir {:?}: {}", cam.path.join(cam.card_subdir), e)));
-        handler_locations.push((path,cam.handler));
+        handlers.push((path,cam.handler));
     }
 
-
-    if let Some(path_buf) = cli.list_thumbnail.as_ref() {
-        let path: &Path = path_buf.as_ref();
-        let file = fs::canonicalize(path)
-            .unwrap_or_else(|e| fail_main(&mut output, format!("error finding the absolute path of input file: {}", e)));
-        let value : &(PathBuf, String) =  value_for_path(&file, &handler_locations)
-            .unwrap_or_else(|| fail_main(&mut output,format!("Couldn't find handler responsible for a dir in the path of the input file")));
-        let handler = get_handler( &(value.1))?;
-        output.file_list = Some(handler.list_thumbnail(&value.0,&file)
-            .unwrap_or_else(|e| fail_main(&mut output, format!("handler {}: {}",handler.name(),e))));
-        output.command_success=true;
-        output.error_string=None;
-    }else if let Some(path_buf) = cli.list_high_quality.as_ref(){
-        let path: &Path = path_buf.as_ref();
-        let file = fs::canonicalize(path)
-            .unwrap_or_else(|e| fail_main(&mut output, format!("error finding the absolute path of input file: {}", e)));
-        let value : &(PathBuf, String) =  value_for_path(&file, &handler_locations)
-            .unwrap_or_else(|| fail_main(&mut output,format!("Couldn't find handler responsible for a dir in the path of the input file")));
-        let handler = get_handler( &(value.1))?;
-        output.file_list = Some(handler.list_high_quality(&value.0,&file)
-            .unwrap_or_else(|e| fail_main(&mut output, format!("handler {}: {}",handler.name(),e))));
-        output.command_success=true;
-        output.error_string=None;
-    }else if let Some(path_buf) = cli.get_related.as_ref(){
-        let path: &Path = path_buf.as_ref();
-        let file = fs::canonicalize(path)
-            .unwrap_or_else(|e| fail_main(&mut output, format!("error finding the absolute path of input file: {}", e)));
-        let value : &(PathBuf, String) =  value_for_path(&file, &handler_locations)
-            .unwrap_or_else(|| fail_main(&mut output,format!("Couldn't find handler responsible for a dir in the path of the input file")));
-        let handler = get_handler( &(value.1))?;
-        output.file_list = Some(handler.get_related(&value.0,&file)
-            .unwrap_or_else(|e| fail_main(&mut output, format!("handler {}: {}",handler.name(),e))));
-        output.command_success=true;
-        output.error_string=None;
+    if let Some(input_file) = cli.list_thumbnail.as_ref() {
+        handle_action_with_input(&mut output, input_file, &handlers, |handler, base, file| handler.list_thumbnail(base, file));
+    }else if let Some(input_file) = cli.list_high_quality.as_ref() {
+        handle_action_with_input(&mut output, input_file, &handlers, |handler, base, file| handler.list_high_quality(base, file));
+    }else if let Some(input_file) = cli.get_related.as_ref() {
+        handle_action_with_input(&mut output, input_file, &handlers, |handler, base, file| handler.get_related(base, file));
     }else{
-        fail_main(&mut output, "Internal error: no action selected".to_string());
+        fail_main(&mut output, "Internal error: no action selected".into());
     }
 
     // Emit everything as JSON to stdout
@@ -209,3 +181,27 @@ fn main() -> Result<()> {
 
     Ok(())
 }
+
+fn handle_action_with_input<F>( mut output: &mut FailJsonOutput, input_file: &PathBuf, handlers: &[(PathBuf, String)], action: F, ) where
+    F: Fn(&dyn SourceMediaAdapter, &PathBuf, &PathBuf) -> Result<Vec<FileItem>>,
+{
+    let input_path = input_file.as_path();
+
+    let file = fs::canonicalize(input_path)
+        .unwrap_or_else(|e| fail_main(&mut output, format!("error finding the absolute path of input file: {}", e)));
+
+    let handler_and_dir = get_handler_and_dir(&file, handlers)
+        .unwrap_or_else(|| fail_main(&mut output, "Couldn't find handler responsible for a dir in the path of the input file".into()));
+
+    let handler = get_handler(&handler_and_dir.1)
+        .unwrap_or_else(|e| fail_main(&mut output, format!("couldn't load handler {}: {}", handler_and_dir.1, e)));
+
+    output.file_list = Some(
+        action(handler.as_ref(), &handler_and_dir.0, &file)
+            .unwrap_or_else(|e| fail_main(&mut output, format!("handler {}: {}", handler.name(), e)))
+    );
+
+    output.command_success = true;
+    output.error_string = None;
+}
+
