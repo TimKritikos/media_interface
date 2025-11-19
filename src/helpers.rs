@@ -58,11 +58,15 @@ pub fn create_part_file_if_exists(file_path:PathBuf, file_type:&str, item_type:&
     }
 }
 
-pub fn create_part_file_that_exists(file_path:PathBuf, file_type:&str, item_type:&str, part_count:u8, part_num:u8) -> Result<FileItem> {
+pub fn create_part_file_that_exists(file_path:PathBuf, file_type:&str, item_type:&str, part_count:u8, part_num:u8, known_missing_files: &Vec<PathBuf>) -> Result<Option<FileItem>> {
     if file_path.exists(){
-        Ok(create_part_file(file_path.to_string_lossy().into_owned(),file_type,item_type,part_count,part_num))
+        Ok(Some(create_part_file(file_path.to_string_lossy().into_owned(),file_type,item_type,part_count,part_num)))
     }else{
-        Err(anyhow::anyhow!("File {:?} expected to exist", file_path.to_string_lossy().into_owned()))
+        if known_missing_files.contains(&file_path){
+            Ok(None)
+        }else{
+            Err(anyhow::anyhow!("File {:?} expected to exist", file_path.to_string_lossy().into_owned()))
+        }
     }
 }
 

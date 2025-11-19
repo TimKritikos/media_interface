@@ -80,7 +80,7 @@ pub struct GoProInterface;
 ////////////////////////////////////////
 
 impl SourceMediaInterface for GoProInterface {
-    fn list_thumbnail( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, ) -> Result<Vec<FileItem>> {
+    fn list_thumbnail( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, _known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>> {
         filter_top_level_dir(source_media_card.as_path(),|filename: &str, ext: Option<&str>, path: &str|{
             match ext {
                 Some("THM") => {
@@ -96,7 +96,7 @@ impl SourceMediaInterface for GoProInterface {
             }
         })
     }
-    fn list_high_quality( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, ) -> Result<Vec<FileItem>> {
+    fn list_high_quality( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, _known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>> {
         filter_top_level_dir(source_media_card.as_path(),|filename: &str, ext: Option<&str>, path: &str|{
             match ext {
                 Some("MP4") => {
@@ -112,7 +112,7 @@ impl SourceMediaInterface for GoProInterface {
             }
         })
     }
-    fn get_related(&self, _source_media_location: &PathBuf, source_media_file: &PathBuf) -> Result<Vec<FileItem>>{
+    fn get_related(&self, _source_media_location: &PathBuf, source_media_file: &PathBuf, known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>>{
         let mut items = Vec::<FileItem>::new();
 
         let ext = source_media_file
@@ -150,7 +150,9 @@ impl SourceMediaInterface for GoProInterface {
                                 items.push(item);
                             }
                         } else {
-                            items.push(create_part_file_that_exists(file, file_type_json, "video", part_count, part)?);
+                            if let Some(item) = create_part_file_that_exists(file, file_type_json, "video", part_count, part, &known_missing_files)?{
+                                items.push(item);
+                            }
                         }
                     }
                 }

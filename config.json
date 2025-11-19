@@ -10,5 +10,10 @@
 			"card_subdir":"DATA",
 			"handler": "Sony-ILCEM4-1"
 		}
-	]
+	],
+	"errata": {
+                "known_missing_files": [
+                        "GoPro_SN:3142/DATA/CARD1234/GL011263.LRV"
+                ]
+        }
 }

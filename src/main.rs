@@ -47,7 +47,13 @@ struct Cli {
 #[derive(Debug, Deserialize)]
 struct Config {
     data_type: String,
-    source_media: Vec<SourceMediaEntry>
+    source_media: Vec<SourceMediaEntry>,
+    errata: Option<Errata>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Errata {
+    known_missing_files: Option<Vec<PathBuf>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -61,9 +67,9 @@ struct SourceMediaEntry {
 // Handler data //
 //////////////////
 trait SourceMediaInterface {
-    fn list_thumbnail(&self, source_media_location: &PathBuf, source_media_card: &PathBuf) -> Result<Vec<FileItem>>;
-    fn list_high_quality(&self, source_media_location: &PathBuf, source_media_card: &PathBuf) -> Result<Vec<FileItem>>;
-    fn get_related(&self, source_media_location: &PathBuf, source_media_file: &PathBuf) -> Result<Vec<FileItem>>;
+    fn list_thumbnail(&self, source_media_location: &PathBuf, source_media_card: &PathBuf, known_missing_file: Vec<PathBuf>) -> Result<Vec<FileItem>>;
+    fn list_high_quality(&self, source_media_location: &PathBuf, source_media_card: &PathBuf, known_missing_file: Vec<PathBuf>) -> Result<Vec<FileItem>>;
+    fn get_related(&self, source_media_location: &PathBuf, source_media_file: &PathBuf, known_missing_file: Vec<PathBuf>) -> Result<Vec<FileItem>>;
     fn name(&self) -> String;
 }
 
@@ -157,18 +163,45 @@ fn main() -> Result<()> {
     let mut handlers: Vec<HandlerMapEntry> = Vec::new();
     for cam in cfg.source_media {
         let path: PathBuf = config_file_path.parent().unwrap().join(&cam.path).join(&cam.card_subdir);
-        let absolute_path: PathBuf = fs::canonicalize(path)
-            .unwrap_or_else(|e| fail_main(&mut output, format!("Error reading source media dir {:?}: {}", cam.path.join(cam.card_subdir), e)));
+        let absolute_path: PathBuf = fs::canonicalize(&path)
+            .unwrap_or_else(|e| fail_main(&mut output, format!("Error reading source media dir {:?}: {}", &path, e)));
         handlers.push(HandlerMapEntry{location:absolute_path,name:cam.handler});
+    }
+
+    let mut known_missing_files: Vec<PathBuf> = Vec::new();
+    match cfg.errata {
+        Some(errata) => {
+            match errata.known_missing_files{
+                Some(known_missing_files_input) => {
+                    for file_input in known_missing_files_input{
+                        let path: PathBuf = config_file_path.parent().unwrap().to_path_buf();
+                        let absolute_path: PathBuf = fs::canonicalize(&path)
+                            .unwrap_or_else(|e| fail_main(&mut output, format!("Error reading errata missing file {:?}: {}", &path, e))).join(&file_input);
+                        known_missing_files.push(absolute_path);
+                    }
+                }
+                None =>{}
+            }
+        }
+        None => {}
     }
 
     // execute the appropriate code of the appropriate handler
     if let Some(input_file) = cli.list_thumbnail.as_ref() {
-        handle_action_with_input(&mut output, input_file, handlers, |handler, base, file| handler.list_thumbnail(base, file));
+
+        handle_action_with_input(&mut output, input_file, handlers, known_missing_files,
+            |handler, base, file, known_missing_files| handler.list_thumbnail(base, file, known_missing_files));
+
     }else if let Some(input_file) = cli.list_high_quality.as_ref() {
-        handle_action_with_input(&mut output, input_file, handlers, |handler, base, file| handler.list_high_quality(base, file));
+
+        handle_action_with_input(&mut output, input_file, handlers, known_missing_files,
+            |handler, base, file, known_missing_files| handler.list_high_quality(base, file, known_missing_files));
+
     }else if let Some(input_file) = cli.get_related.as_ref() {
-        handle_action_with_input(&mut output, input_file, handlers, |handler, base, file| handler.get_related(base, file));
+
+        handle_action_with_input(&mut output, input_file, handlers, known_missing_files,
+            |handler, base, file, known_missing_files| handler.get_related(base, file, known_missing_files));
+
     }else{
         fail_main(&mut output, "Internal error: no action selected".into());
     }
@@ -179,8 +212,8 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn handle_action_with_input<F>( mut output: &mut OutputJson, input_file: &PathBuf, handlers: Vec<HandlerMapEntry>, action: F, ) where
-    F: Fn(&dyn SourceMediaInterface, &PathBuf, &PathBuf) -> Result<Vec<FileItem>>,
+fn handle_action_with_input<F>( mut output: &mut OutputJson, input_file: &PathBuf, handlers: Vec<HandlerMapEntry>, known_missing_files: Vec<PathBuf>, action: F, ) where
+    F: Fn(&dyn SourceMediaInterface, &PathBuf, &PathBuf, Vec<PathBuf>) -> Result<Vec<FileItem>>,
 {
     let input_path = input_file.as_path();
 
@@ -195,7 +228,7 @@ fn handle_action_with_input<F>( mut output: &mut OutputJson, input_file: &PathBu
         .unwrap_or_else(|e| fail_main(&mut output, format!("couldn't load handler {}: {}", handler_entry.name, e)));
 
     output.file_list = Some(
-        action(handler.as_ref(), &handler_entry.location, &file)
+        action(handler.as_ref(), &handler_entry.location, &file, known_missing_files)
             .unwrap_or_else(|e| fail_main(&mut output, format!("handler {}: {}", handler.name(), e)))
     );
 
