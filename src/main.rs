@@ -153,15 +153,13 @@ fn main() -> Result<()> {
         fail_main(&mut output, format!("Invalid data type on the config file: {}", cfg.data_type));
     }
 
-    // Set current dir to match relative paths in config
-    let _ = env::set_current_dir(&config_file_path.parent().unwrap());
-
     // Load handler data from config data
     let mut handlers: Vec<HandlerMapEntry> = Vec::new();
     for cam in cfg.source_media {
-        let path: PathBuf = fs::canonicalize(cam.path.join(&cam.card_subdir))
+        let path: PathBuf = config_file_path.parent().unwrap().join(&cam.path).join(&cam.card_subdir);
+        let absolute_path: PathBuf = fs::canonicalize(path)
             .unwrap_or_else(|e| fail_main(&mut output, format!("Error reading source media dir {:?}: {}", cam.path.join(cam.card_subdir), e)));
-        handlers.push(HandlerMapEntry{location:path,name:cam.handler});
+        handlers.push(HandlerMapEntry{location:absolute_path,name:cam.handler});
     }
 
     // execute the appropriate code of the appropriate handler
