@@ -9,7 +9,7 @@ use crate::FileItem;
 ////////////////////////////////////////
 
 fn get_gopro_video_part_id(filename:String) -> Result<u8> {
-     return match filename.as_str().get(2..4).unwrap().parse::<u8>() {
+    return match filename.as_str().get(2..4).unwrap().parse::<u8>() {
         Ok(p) => Ok(p),
         Err(e) => { return Err(anyhow::anyhow!("Error parsing filename: {}",e)); }
     };
@@ -87,7 +87,7 @@ impl SourceMediaInterface for GoProInterface {
                     if get_gopro_video_part_id(filename.to_string())? == 1 {
                         Ok(Some(create_simple_file(path.to_string(), "image", "video")))
                     } else {
-                        Err(anyhow::anyhow!("Unable to parse video id file {}",path))
+                        Ok(None)
                     }
                 }
                 Some("JPG") => Ok(Some(create_simple_file(path.to_string(), "image", "image"))),
@@ -103,7 +103,7 @@ impl SourceMediaInterface for GoProInterface {
                     if get_gopro_video_part_id(filename.to_string())? == 1 {
                         Ok(Some(create_simple_file(path.to_string(), "image", "video")))
                     } else {
-                        Err(anyhow::anyhow!("Unable to parse video id file {}",path))
+                        Ok(None)
                     }
                 }
                 Some("JPG") => Ok(Some(create_simple_file(path.to_string(), "image", "image"))),
