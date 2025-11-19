@@ -1,5 +1,5 @@
 use anyhow::{Result};
-use std::path::{Path};
+use std::path::{Path,PathBuf};
 use std::fs;
 use crate::FileItem;
 
@@ -32,6 +32,38 @@ where
         }
     }
     Ok(())
+}
+
+pub fn create_simple_file_if_exists(file_path:PathBuf, file_type:&str, item_type:&str) -> Option<FileItem> {
+    if file_path.exists(){
+        Some(create_simple_file(file_path.to_string_lossy().into_owned(),file_type,item_type))
+    }else{
+        None
+    }
+}
+
+//pub fn create_simple_file_that_exists(file_path:PathBuf, file_type:&str, item_type:&str) -> Result<FileItem> {
+//    if file_path.exists(){
+//        Ok(create_simple_file(file_path.to_string_lossy().into_owned(),file_type,item_type))
+//    }else{
+//        Err(anyhow::anyhow!("File {:?} expected to exist", file_path.to_string_lossy().into_owned()))
+//    }
+//}
+
+pub fn create_part_file_if_exists(file_path:PathBuf, file_type:&str, item_type:&str, part_count:u8, part_num:u8) -> Option<FileItem> {
+    if file_path.exists(){
+        Some(create_part_file(file_path.to_string_lossy().into_owned(),file_type,item_type,part_count,part_num))
+    }else{
+        None
+    }
+}
+
+pub fn create_part_file_that_exists(file_path:PathBuf, file_type:&str, item_type:&str, part_count:u8, part_num:u8) -> Result<FileItem> {
+    if file_path.exists(){
+        Ok(create_part_file(file_path.to_string_lossy().into_owned(),file_type,item_type,part_count,part_num))
+    }else{
+        Err(anyhow::anyhow!("File {:?} expected to exist", file_path.to_string_lossy().into_owned()))
+    }
 }
 
 pub fn create_simple_file(file_path:String, file_type:&str, item_type:&str) -> FileItem {
