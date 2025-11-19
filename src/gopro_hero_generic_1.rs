@@ -136,31 +136,36 @@ impl SourceMediaAdapter for GoProAdapter {
                 }
 
                 for part in 1..=part_count {
-                    //TODO: Maybe emove the check and calculations for the first one
-                    let mp4_file_path=create_gopro_video_file(source_media_file,part,GoProVideoFileType::HighBitrateVideo)?;
-                    items.push(create_part_file_that_exists(mp4_file_path,"video","video",part_count,part)?);
+                    let video_types = [
+                        (GoProVideoFileType::HighBitrateVideo, "video",         false),
+                        (GoProVideoFileType::LowBitrateVideo,  "video-preview", false),
+                        (GoProVideoFileType::ThumbnailPhoto,   "photo-preview", false),
+                        (GoProVideoFileType::WavAudio,         "audio",         true),
+                    ];
 
-                    let lrv_filename=create_gopro_video_file(source_media_file,part,GoProVideoFileType::LowBitrateVideo)?;
-                    items.push(create_part_file_that_exists(lrv_filename,"video-preview","video",part_count,part)?);
-
-                    let thm_filename=create_gopro_video_file(source_media_file,part,GoProVideoFileType::ThumbnailPhoto)?;
-                    items.push(create_part_file_that_exists(thm_filename,"photo-preview","video",part_count,part)?);
-
-                    let wav_filename=create_gopro_video_file(source_media_file,part,GoProVideoFileType::WavAudio)?;
-                    if let Some(v) = create_part_file_if_exists(wav_filename,"audio","video",part_count,part){
-                        items.push(v);
+                    for (file_type_enum, file_type_json, optional) in video_types {
+                        let file = create_gopro_video_file(source_media_file, part, file_type_enum)?;
+                        if optional {
+                            if let Some(item) = create_part_file_if_exists(file, file_type_json, "video", part_count, part) {
+                                items.push(item);
+                            }
+                        } else {
+                            items.push(create_part_file_that_exists(file, file_type_json, "video", part_count, part)?);
+                        }
                     }
                 }
             },
             Some("JPG")|Some("GPR") => {
-                let jpeg_file=create_gopro_photo_file(source_media_file,GoProPhotoFileType::JpegPhoto)?;
-                if let Some(v) = create_simple_file_if_exists(jpeg_file,"photo","photo"){
-                    items.push(v);
-                }
+                let photo_types = [
+                    (GoProPhotoFileType::JpegPhoto, "photo"),
+                    (GoProPhotoFileType::RawPhoto,  "photo-raw"),
+                ];
 
-                let gpr_file=create_gopro_photo_file(source_media_file,GoProPhotoFileType::RawPhoto)?;
-                if let Some(v) = create_simple_file_if_exists(gpr_file,"photo-raw","photo") {
-                    items.push(v);
+                for (file_type_enum, file_type_json) in photo_types {
+                    let file = create_gopro_photo_file(source_media_file, file_type_enum)?;
+                    if let Some(v) = create_simple_file_if_exists(file, file_type_json, "photo") {
+                        items.push(v);
+                    }
                 }
             }
             _ => {
