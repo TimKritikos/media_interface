@@ -73,12 +73,20 @@ trait SourceMediaInterface {
     fn name(&self) -> String;
 }
 
-fn get_handler(t: &str) -> Result<Box<dyn SourceMediaInterface>> {
-    Ok(match t {
-        "GoPro-Hero-Generic-1" => Box::new(gopro_hero_generic_1::GoProInterface),
-        "Sony-ILCEM4-1" => Box::new(sony_ilcem4_1::SonyInterface),
-        unknown  => anyhow::bail!("Unknown camera type: {}", unknown)
-    })
+fn get_handler(id: &str) -> Result<Box<dyn SourceMediaInterface>> {
+    let factories: Vec<fn() -> Box<dyn SourceMediaInterface>> = vec![
+        || Box::new(gopro_hero_generic_1::GoProInterface),
+        || Box::new(sony_ilcem4_1::SonyInterface),
+    ];
+
+    for factory in factories {
+        let instance = factory();
+        if instance.name() == id {
+            return Ok(instance);
+        }
+    }
+
+    Err(anyhow::anyhow!("Unknown handler ID '{}'", id))
 }
 
 struct HandlerMapEntry{

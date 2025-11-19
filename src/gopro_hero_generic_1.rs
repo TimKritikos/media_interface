@@ -178,6 +178,6 @@ impl SourceMediaInterface for GoProInterface {
     }
 
     fn name(&self) -> String {
-        return "GoPro-Generic-1".to_string()
+        return "GoPro-Hero-Generic-1".to_string()
     }
 }
