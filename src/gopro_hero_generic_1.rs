@@ -91,7 +91,7 @@ impl SourceMediaInterface for GoProInterface {
                     }
                 }
                 Some("JPG") => Ok(Some(create_simple_file(path.to_string(), "image", "image"))),
-                Some("MP4") | Some("GPR") | Some("LRV") => Ok(None),
+                Some("MP4") | Some("GPR") | Some("LRV") | Some("WAV") => Ok(None),
                 Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path)),
             }
         })
@@ -107,7 +107,7 @@ impl SourceMediaInterface for GoProInterface {
                     }
                 }
                 Some("JPG") => Ok(Some(create_simple_file(path.to_string(), "image", "image"))),
-                Some("THM") | Some("GPR") | Some("LRV") => Ok(None),
+                Some("THM") | Some("GPR") | Some("LRV") | Some("WAV") => Ok(None),
                 Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path)),
             }
         })
