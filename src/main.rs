@@ -84,7 +84,7 @@ struct HandlerMapEntry{
 // Output JSON structure data //
 ////////////////////////////////
 #[derive(Serialize, Deserialize)]
-struct FailJsonOutput {
+struct OutputJson {
     data_type: &'static str,
     version: &'static str,
     command_success: bool,
@@ -108,7 +108,7 @@ struct FileItem {
 //////////
 // Main //
 //////////
-fn fail_main( data: &mut FailJsonOutput, error: String ) -> ! {
+fn fail_main( data: &mut OutputJson, error: String ) -> ! {
     data.error_string=Some(error.clone());
     data.file_list=None;
     println!("{}", serde_json::to_string(&data).unwrap_or_else(|_| "Failed to serialise json".to_string()));
@@ -117,7 +117,7 @@ fn fail_main( data: &mut FailJsonOutput, error: String ) -> ! {
 }
 
 fn main() -> Result<()> {
-    let mut output = FailJsonOutput{
+    let mut output = OutputJson{
         data_type: "source_media_interface_api",
         version: env!("CARGO_PKG_VERSION"),
         command_success: false,
@@ -179,7 +179,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn handle_action_with_input<F>( mut output: &mut FailJsonOutput, input_file: &PathBuf, handlers: Vec<HandlerMapEntry>, action: F, ) where
+fn handle_action_with_input<F>( mut output: &mut OutputJson, input_file: &PathBuf, handlers: Vec<HandlerMapEntry>, action: F, ) where
     F: Fn(&dyn SourceMediaInterface, &PathBuf, &PathBuf) -> Result<Vec<FileItem>>,
 {
     let input_path = input_file.as_path();
