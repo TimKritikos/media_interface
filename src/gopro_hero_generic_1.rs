@@ -129,8 +129,13 @@ impl SourceMediaInterface for GoProInterface {
                     }
                     return Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?)));
                 }
-                Some("JPG") => Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?))),
-                Some("THM") | Some("GPR") | Some("LRV") | Some("WAV") => Ok(None),
+                Some("GPR") | Some ("JPG") => {
+                    if ext == Some("GPR") || !create_gopro_photo_file(&PathBuf::from(path), GoProPhotoFileType::RawPhoto).unwrap().exists() {
+                        return Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?)))
+                    }
+                    return Ok(None);
+                }
+                Some("THM") | Some("LRV") | Some("WAV") => Ok(None),
                 Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path)),
             }
         })
