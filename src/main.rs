@@ -197,17 +197,17 @@ fn main() -> Result<()> {
     // execute the appropriate code of the appropriate handler
     if let Some(input_file) = cli.list_thumbnail.as_ref() {
 
-        handle_action_with_input(&mut output, input_file, handlers, known_missing_files,
+        handle_action_with_input(&mut output, input_file, handlers, known_missing_files, true,
             |handler, base, file, known_missing_files| handler.list_thumbnail(base, file, known_missing_files));
 
     }else if let Some(input_file) = cli.list_high_quality.as_ref() {
 
-        handle_action_with_input(&mut output, input_file, handlers, known_missing_files,
+        handle_action_with_input(&mut output, input_file, handlers, known_missing_files, true,
             |handler, base, file, known_missing_files| handler.list_high_quality(base, file, known_missing_files));
 
     }else if let Some(input_file) = cli.get_related.as_ref() {
 
-        handle_action_with_input(&mut output, input_file, handlers, known_missing_files,
+        handle_action_with_input(&mut output, input_file, handlers, known_missing_files, false,
             |handler, base, file, known_missing_files| handler.get_related(base, file, known_missing_files));
 
     }else{
@@ -220,7 +220,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn handle_action_with_input<F>( mut output: &mut OutputJson, input_file: &PathBuf, handlers: Vec<HandlerMapEntry>, known_missing_files: Vec<PathBuf>, action: F, ) where
+fn handle_action_with_input<F>( mut output: &mut OutputJson, input_file: &PathBuf, handlers: Vec<HandlerMapEntry>, known_missing_files: Vec<PathBuf>, arg_is_card: bool, action: F, ) where
     F: Fn(&dyn SourceMediaInterface, &PathBuf, &PathBuf, Vec<PathBuf>) -> Result<Vec<FileItem>>,
 {
     let input_path = input_file.as_path();
@@ -234,6 +234,10 @@ fn handle_action_with_input<F>( mut output: &mut OutputJson, input_file: &PathBu
 
     let handler = get_handler(&handler_entry.name)
         .unwrap_or_else(|e| fail_main(&mut output, format!("couldn't load handler {}: {}", handler_entry.name, e)));
+
+    if arg_is_card == true && file.parent().unwrap() != handler_entry.location {
+        fail_main(&mut output, format!("List path entered is not a card directory"));
+    }
 
     output.file_list = Some(
         action(handler.as_ref(), &handler_entry.location, &file, known_missing_files)
