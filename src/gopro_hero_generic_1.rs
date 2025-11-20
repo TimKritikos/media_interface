@@ -80,15 +80,20 @@ pub struct GoProInterface;
 ////////////////////////////////////////
 
 impl SourceMediaInterface for GoProInterface {
-    fn list_thumbnail( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, _known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>> {
+    fn list_thumbnail( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>> {
         filter_top_level_dir(source_media_card.as_path(),|filename: &str, ext: Option<&str>, path: &str|{
             match ext {
                 Some("THM") => {
-                    if get_gopro_video_part_id(filename.to_string())? == 1 {
-                        Ok(Some(create_simple_file(path.to_string(), "image", "video")))
-                    } else {
-                        Ok(None)
+                    let part_id = get_gopro_video_part_id(filename.to_string())?;
+                    if part_id != 1 {
+                        for n in 1..part_id{
+                            let n_file=create_gopro_video_file(&PathBuf::from(path),n,GoProVideoFileType::HighBitrateVideo)?;
+                            if ! known_missing_files.contains(&n_file){
+                                return Ok(None);
+                            }
+                        }
                     }
+                    return Ok(Some(create_simple_file(path.to_string(), "image", "video")));
                 }
                 Some("JPG") => Ok(Some(create_simple_file(path.to_string(), "image", "image"))),
                 Some("MP4") | Some("GPR") | Some("LRV") | Some("WAV") => Ok(None),
@@ -96,15 +101,20 @@ impl SourceMediaInterface for GoProInterface {
             }
         })
     }
-    fn list_high_quality( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, _known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>> {
+    fn list_high_quality( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>> {
         filter_top_level_dir(source_media_card.as_path(),|filename: &str, ext: Option<&str>, path: &str|{
             match ext {
                 Some("MP4") => {
-                    if get_gopro_video_part_id(filename.to_string())? == 1 {
-                        Ok(Some(create_simple_file(path.to_string(), "image", "video")))
-                    } else {
-                        Ok(None)
+                    let part_id = get_gopro_video_part_id(filename.to_string())?;
+                    if part_id != 1 {
+                        for n in 1..part_id{
+                            let n_file=create_gopro_video_file(&PathBuf::from(path),n,GoProVideoFileType::HighBitrateVideo)?;
+                            if ! known_missing_files.contains(&n_file){
+                                return Ok(None);
+                            }
+                        }
                     }
+                    return Ok(Some(create_simple_file(path.to_string(), "image", "video")));
                 }
                 Some("JPG") => Ok(Some(create_simple_file(path.to_string(), "image", "image"))),
                 Some("THM") | Some("GPR") | Some("LRV") | Some("WAV") => Ok(None),
