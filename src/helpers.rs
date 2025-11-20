@@ -34,33 +34,38 @@ where
     Ok(())
 }
 
-pub fn create_simple_file_if_exists(file_path:PathBuf, file_type:&str, item_type:&str) -> Option<FileItem> {
+pub struct JsonFileInfoTypes<'a>{
+    pub file_type: &'a str,
+    pub item_type: &'a str,
+}
+
+pub fn create_simple_file_if_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes) -> Option<FileItem> {
     if file_path.exists(){
-        Some(create_simple_file(file_path.to_string_lossy().into_owned(),file_type,item_type))
+        Some(create_simple_file(file_path.to_string_lossy().into_owned(),json_file_info))
     }else{
         None
     }
 }
 
-//pub fn create_simple_file_that_exists(file_path:PathBuf, file_type:&str, item_type:&str) -> Result<FileItem> {
+//pub fn create_simple_file_that_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes) -> Result<FileItem> {
 //    if file_path.exists(){
-//        Ok(create_simple_file(file_path.to_string_lossy().into_owned(),file_type,item_type))
+//        Ok(create_simple_file(file_path.to_string_lossy().into_owned(),json_file_info))
 //    }else{
 //        Err(anyhow::anyhow!("File {:?} expected to exist", file_path.to_string_lossy().into_owned()))
 //    }
 //}
 
-pub fn create_part_file_if_exists(file_path:PathBuf, file_type:&str, item_type:&str, part_count:u8, part_num:u8) -> Option<FileItem> {
+pub fn create_part_file_if_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes, part_count:u8, part_num:u8) -> Option<FileItem> {
     if file_path.exists(){
-        Some(create_part_file(file_path.to_string_lossy().into_owned(),file_type,item_type,part_count,part_num))
+        Some(create_part_file(file_path.to_string_lossy().into_owned(),json_file_info,part_count,part_num))
     }else{
         None
     }
 }
 
-pub fn create_part_file_that_exists(file_path:PathBuf, file_type:&str, item_type:&str, part_count:u8, part_num:u8, known_missing_files: &Vec<PathBuf>) -> Result<Option<FileItem>> {
+pub fn create_part_file_that_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes, part_count:u8, part_num:u8, known_missing_files: &Vec<PathBuf>) -> Result<Option<FileItem>> {
     if file_path.exists(){
-        Ok(Some(create_part_file(file_path.to_string_lossy().into_owned(),file_type,item_type,part_count,part_num)))
+        Ok(Some(create_part_file(file_path.to_string_lossy().into_owned(),json_file_info,part_count,part_num)))
     }else{
         if known_missing_files.contains(&file_path){
             Ok(None)
@@ -70,21 +75,21 @@ pub fn create_part_file_that_exists(file_path:PathBuf, file_type:&str, item_type
     }
 }
 
-pub fn create_simple_file(file_path:String, file_type:&str, item_type:&str) -> FileItem {
+pub fn create_simple_file(file_path:String, json_file_info: JsonFileInfoTypes) -> FileItem {
     FileItem{
         file_path:file_path,
-        file_type:file_type.to_string(),
-        item_type:item_type.to_string(),
+        file_type:json_file_info.file_type.to_string(),
+        item_type:json_file_info.item_type.to_string(),
         part_count:None,
         part_num:None,
     }
 }
 
-pub fn create_part_file(file_path:String, file_type:&str, item_type:&str, part_count:u8, part_num:u8) -> FileItem {
+pub fn create_part_file(file_path:String, json_file_info: JsonFileInfoTypes, part_count:u8, part_num:u8) -> FileItem {
     FileItem{
         file_path:file_path,
-        file_type:file_type.to_string(),
-        item_type:item_type.to_string(),
+        file_type:json_file_info.file_type.to_string(),
+        item_type:json_file_info.item_type.to_string(),
         part_count:Some(part_count),
         part_num:Some(part_num),
     }

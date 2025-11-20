@@ -79,6 +79,19 @@ pub struct GoProInterface;
 //         File parsing code          //
 ////////////////////////////////////////
 
+fn filetype(ext: &str) -> Result<crate::helpers::JsonFileInfoTypes<'_>> {
+    match ext {
+        "THM" => Ok(JsonFileInfoTypes{ file_type:"image-preview",item_type:"video" }),
+        "MP4" => Ok(JsonFileInfoTypes{ file_type:"video",        item_type:"video" }),
+        "LRV" => Ok(JsonFileInfoTypes{ file_type:"video-preview",item_type:"video" }),
+        "WAV" => Ok(JsonFileInfoTypes{ file_type:"audio"        ,item_type:"video" }),
+
+        "JPG" => Ok(JsonFileInfoTypes{ file_type:"image"        ,item_type:"image" }),
+        "GPR" => Ok(JsonFileInfoTypes{ file_type:"image-raw"    ,item_type:"image" }),
+        _ => Err(anyhow::anyhow!("unkown file extension {:?} trying to determain file type", ext)),
+    }
+}
+
 impl SourceMediaInterface for GoProInterface {
     fn list_thumbnail( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>> {
         filter_top_level_dir(source_media_card.as_path(),|filename: &str, ext: Option<&str>, path: &str|{
@@ -93,9 +106,9 @@ impl SourceMediaInterface for GoProInterface {
                             }
                         }
                     }
-                    return Ok(Some(create_simple_file(path.to_string(), "image", "video")));
+                    return Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?)));
                 }
-                Some("JPG") => Ok(Some(create_simple_file(path.to_string(), "image", "image"))),
+                Some("JPG") => Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?))),
                 Some("MP4") | Some("GPR") | Some("LRV") | Some("WAV") => Ok(None),
                 Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path)),
             }
@@ -114,9 +127,9 @@ impl SourceMediaInterface for GoProInterface {
                             }
                         }
                     }
-                    return Ok(Some(create_simple_file(path.to_string(), "image", "video")));
+                    return Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?)));
                 }
-                Some("JPG") => Ok(Some(create_simple_file(path.to_string(), "image", "image"))),
+                Some("JPG") => Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?))),
                 Some("THM") | Some("GPR") | Some("LRV") | Some("WAV") => Ok(None),
                 Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path)),
             }
@@ -148,20 +161,20 @@ impl SourceMediaInterface for GoProInterface {
 
                 for part in 1..=part_count {
                     let video_types = [
-                        (GoProVideoFileType::HighBitrateVideo, "video",         false),
-                        (GoProVideoFileType::LowBitrateVideo,  "video-preview", false),
-                        (GoProVideoFileType::ThumbnailPhoto,   "photo-preview", false),
-                        (GoProVideoFileType::WavAudio,         "audio",         true),
+                        (GoProVideoFileType::HighBitrateVideo, false),
+                        (GoProVideoFileType::LowBitrateVideo,  false),
+                        (GoProVideoFileType::ThumbnailPhoto,   false),
+                        (GoProVideoFileType::WavAudio,         true ),
                     ];
 
-                    for (file_type_enum, file_type_json, optional) in video_types {
+                    for (file_type_enum, optional) in video_types {
                         let file = create_gopro_video_file(source_media_file, part, file_type_enum)?;
                         if optional {
-                            if let Some(item) = create_part_file_if_exists(file, file_type_json, "video", part_count, part) {
+                            if let Some(item) = create_part_file_if_exists(&file, filetype(file.extension().unwrap().to_str().unwrap())?, part_count, part) {
                                 items.push(item);
                             }
                         } else {
-                            if let Some(item) = create_part_file_that_exists(file, file_type_json, "video", part_count, part, &known_missing_files)?{
+                            if let Some(item) = create_part_file_that_exists(&file, filetype(file.extension().unwrap().to_str().unwrap())?, part_count, part, &known_missing_files)?{
                                 items.push(item);
                             }
                         }
@@ -169,14 +182,9 @@ impl SourceMediaInterface for GoProInterface {
                 }
             },
             Some("JPG")|Some("GPR") => {
-                let photo_types = [
-                    (GoProPhotoFileType::JpegPhoto, "photo"),
-                    (GoProPhotoFileType::RawPhoto,  "photo-raw"),
-                ];
-
-                for (file_type_enum, file_type_json) in photo_types {
+                for file_type_enum in [GoProPhotoFileType::JpegPhoto,GoProPhotoFileType::RawPhoto] {
                     let file = create_gopro_photo_file(source_media_file, file_type_enum)?;
-                    if let Some(v) = create_simple_file_if_exists(file, file_type_json, "photo") {
+                    if let Some(v) = create_simple_file_if_exists(&file, filetype(file.extension().unwrap().to_str().unwrap())?) {
                         items.push(v);
                     }
                 }
