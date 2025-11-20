@@ -126,7 +126,8 @@ impl SourceMediaInterface for GoProInterface {
                 let mut part_count:u8 = 0;
 
                 for part in 1..=99 {
-                    if create_gopro_video_file(source_media_file,part,GoProVideoFileType::HighBitrateVideo)?.exists() {
+                    let file = create_gopro_video_file(source_media_file,part,GoProVideoFileType::HighBitrateVideo)?;
+                    if file.exists() || known_missing_files.contains(&file) {
                         part_count+=1;
                     }else if part_count==0 {
                         return Err(anyhow::anyhow!("Iniital video file not found"));
