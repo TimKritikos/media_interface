@@ -7,6 +7,7 @@ use std::fs;
 
 mod gopro_hero_generic_1;
 mod sony_ilcem4_1;
+mod generic_single_file_items;
 mod helpers;
 
 /////////////////////////////////
@@ -77,6 +78,7 @@ fn get_handler(id: &str) -> Result<Box<dyn SourceMediaInterface>> {
     let factories: Vec<fn() -> Box<dyn SourceMediaInterface>> = vec![
         || Box::new(gopro_hero_generic_1::GoProInterface),
         || Box::new(sony_ilcem4_1::SonyInterface),
+        || Box::new(generic_single_file_items::GenericSingleFileItem),
     ];
 
     for factory in factories {
