@@ -26,7 +26,14 @@ impl SourceMediaInterface for GenericSingleFileItem {
                 Some(a) => {
                     match a.to_lowercase().as_str() {
                         "jpg" | "png" | "mp4" | "wav" | "3gpp"
-                          => Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?))),
+                          => {
+                              let types=filetype(ext.unwrap())?;
+                              match types.file_type{
+                                FileVideo => Ok(Some(create_part_file(path.to_string(), types,1,1))),
+                                FileImage => Ok(Some(create_simple_file(path.to_string(), types))),
+                                _ => Err(anyhow::anyhow!("unexpected file type")),
+                              }
+                          }
                         _ => Err(anyhow::anyhow!("File has no extension {}", path)),
                     }
                 }
@@ -38,7 +45,12 @@ impl SourceMediaInterface for GenericSingleFileItem {
         self.list_thumbnail(source_media_location,source_media_card,known_missing_files)
     }
     fn get_related(&self, _source_media_location: &PathBuf, source_media_file: &PathBuf, _known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>>{
-        Ok(vec![create_simple_file(source_media_file.to_string_lossy().into_owned(), filetype(source_media_file.extension().unwrap().to_string_lossy().as_ref())?)])
+        let types=filetype(source_media_file.extension().unwrap().to_string_lossy().as_ref())?;
+        match types.file_type{
+            FileVideo => Ok(vec![create_part_file(source_media_file.to_string_lossy().into_owned(), types,1,1)]),
+            FileImage => Ok(vec![create_simple_file(source_media_file.to_string_lossy().into_owned(), types)]),
+            _ => Err(anyhow::anyhow!("unexpected file type")),
+        }
     }
     fn name(&self) -> String {
         return "Generic-Single-File-Items".to_string()
