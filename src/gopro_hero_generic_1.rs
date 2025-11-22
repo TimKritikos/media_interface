@@ -3,6 +3,8 @@ use crate::SourceMediaInterface;
 use std::path::{PathBuf};
 use crate::helpers::*;
 use crate::FileItem;
+use crate::helpers::ItemType::*;
+use crate::helpers::FileType::*;
 
 ////////////////////////////////////////
 //       GoPro Specific helpers       //
@@ -105,15 +107,15 @@ fn count_gopro_parts( base_file:&PathBuf, known_missing_files: &Vec<PathBuf> ) -
     return Ok(parts);
 }
 
-fn filetype(ext: &str) -> Result<crate::helpers::JsonFileInfoTypes<'_>> {
+fn filetype(ext: &str) -> Result<crate::helpers::JsonFileInfoTypes> {
     match ext {
-        "THM" => Ok(JsonFileInfoTypes{ file_type:"image-preview",item_type:"video" }),
-        "MP4" => Ok(JsonFileInfoTypes{ file_type:"video",        item_type:"video" }),
-        "LRV" => Ok(JsonFileInfoTypes{ file_type:"video-preview",item_type:"video" }),
-        "WAV" => Ok(JsonFileInfoTypes{ file_type:"audio"        ,item_type:"video" }),
+        "THM" => Ok(JsonFileInfoTypes{ file_type:FileImagePreview ,item_type:ItemVideo }),
+        "MP4" => Ok(JsonFileInfoTypes{ file_type:FileVideo        ,item_type:ItemVideo }),
+        "LRV" => Ok(JsonFileInfoTypes{ file_type:FileVideoPreview ,item_type:ItemVideo }),
+        "WAV" => Ok(JsonFileInfoTypes{ file_type:FileAudio        ,item_type:ItemVideo }),
 
-        "JPG" => Ok(JsonFileInfoTypes{ file_type:"image"        ,item_type:"image" }),
-        "GPR" => Ok(JsonFileInfoTypes{ file_type:"image-raw"    ,item_type:"image" }),
+        "JPG" => Ok(JsonFileInfoTypes{ file_type:FileImage        ,item_type:ItemImage }),
+        "GPR" => Ok(JsonFileInfoTypes{ file_type:FileImageRaw     ,item_type:ItemImage }),
         _ => Err(anyhow::anyhow!("unkown file extension {:?} trying to determain file type", ext)),
     }
 }

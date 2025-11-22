@@ -3,16 +3,18 @@ use crate::SourceMediaInterface;
 use std::path::{PathBuf};
 use crate::helpers::*;
 use crate::FileItem;
+use crate::helpers::ItemType::*;
+use crate::helpers::FileType::*;
 
 pub struct GenericSingleFileItem;
 
-fn filetype(ext: &str) -> Result<crate::helpers::JsonFileInfoTypes<'_>> {
+fn filetype(ext: &str) -> Result<crate::helpers::JsonFileInfoTypes> {
     match ext.to_lowercase().as_str() {
-        "jpg"   => Ok(JsonFileInfoTypes{ file_type:"image",item_type:"image" }),
-        "png"   => Ok(JsonFileInfoTypes{ file_type:"image",item_type:"image" }),
-        "mp4"   => Ok(JsonFileInfoTypes{ file_type:"video",item_type:"video" }),
-        "wav"   => Ok(JsonFileInfoTypes{ file_type:"audio",item_type:"audio" }),
-        "3gpp"  => Ok(JsonFileInfoTypes{ file_type:"audio",item_type:"audio" }),
+        "jpg"   => Ok(JsonFileInfoTypes{ file_type:FileImage,item_type:ItemImage }),
+        "png"   => Ok(JsonFileInfoTypes{ file_type:FileImage,item_type:ItemImage }),
+        "mp4"   => Ok(JsonFileInfoTypes{ file_type:FileVideo,item_type:ItemVideo }),
+        "wav"   => Ok(JsonFileInfoTypes{ file_type:FileAudio,item_type:ItemAudio }),
+        "3gpp"  => Ok(JsonFileInfoTypes{ file_type:FileAudio,item_type:ItemAudio }),
         _ => Err(anyhow::anyhow!("unkown file extension {:?} trying to determain file type", ext)),
     }
 }

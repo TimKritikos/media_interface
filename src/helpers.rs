@@ -2,6 +2,8 @@ use anyhow::{Result};
 use std::path::{Path,PathBuf};
 use std::fs;
 use crate::FileItem;
+use crate::helpers::ItemType::*;
+use crate::helpers::FileType::*;
 
 pub fn for_each_file_type<F>(dir: &Path, mut f: F) -> Result<()>
 where
@@ -34,9 +36,28 @@ where
     Ok(())
 }
 
-pub struct JsonFileInfoTypes<'a>{
-    pub file_type: &'a str,
-    pub item_type: &'a str,
+pub enum FileType{
+   FileVideo,
+   FileVideoPreview,
+   #[allow(dead_code)]
+   FileVideoRaw,
+
+   FileImage,
+   FileImagePreview,
+   FileImageRaw,
+
+   FileAudio,
+}
+
+pub enum ItemType{
+    ItemVideo,
+    ItemImage,
+    ItemAudio,
+}
+
+pub struct JsonFileInfoTypes{
+    pub file_type: FileType,
+    pub item_type: ItemType,
 }
 
 pub fn create_simple_file_if_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes) -> Option<FileItem> {
@@ -78,21 +99,30 @@ pub fn create_part_file_that_exists(file_path:&PathBuf, json_file_info: JsonFile
 pub fn create_simple_file(file_path:String, json_file_info: JsonFileInfoTypes) -> FileItem {
     FileItem{
         file_path:file_path,
-        file_type:json_file_info.file_type.to_string(),
-        item_type:json_file_info.item_type.to_string(),
+        file_type:match json_file_info.file_type{
+            FileVideo          => "video",
+            FileVideoPreview  => "video-preview",
+            FileVideoRaw      => "video-raw",
+            FileImage          => "image",
+            FileImagePreview  => "image-preview",
+            FileImageRaw      => "image-raw",
+            FileAudio          => "audio",
+        }.to_string(),
+        item_type:match json_file_info.item_type{
+            ItemVideo => "video",
+            ItemImage => "image",
+            ItemAudio => "audio",
+        }.to_string(),
         part_count:None,
         part_num:None,
     }
 }
 
 pub fn create_part_file(file_path:String, json_file_info: JsonFileInfoTypes, part_count:u8, part_num:u8) -> FileItem {
-    FileItem{
-        file_path:file_path,
-        file_type:json_file_info.file_type.to_string(),
-        item_type:json_file_info.item_type.to_string(),
-        part_count:Some(part_count),
-        part_num:Some(part_num),
-    }
+    let mut ret=create_simple_file(file_path,json_file_info);
+    ret.part_count=Some(part_count);
+    ret.part_num=Some(part_num);
+    return ret;
 }
 
 pub fn filter_top_level_dir<F>(source_dir: &Path, mut filter: F) -> Result<Vec<FileItem>>
