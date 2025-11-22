@@ -79,6 +79,32 @@ pub struct GoProInterface;
 //         File parsing code          //
 ////////////////////////////////////////
 
+struct PartCount{
+    existing_parts_count:u8,
+    all_parts_count:u8,
+}
+
+fn count_gopro_parts( base_file:&PathBuf, known_missing_files: &Vec<PathBuf> ) -> Result<PartCount> {
+
+    let mut parts:PartCount=PartCount{existing_parts_count:0, all_parts_count:0};
+
+    for part in 1..=99 {
+        let file = create_gopro_video_file(base_file,part,GoProVideoFileType::HighBitrateVideo)?;
+        if file.exists() {
+            parts.existing_parts_count+=1;
+            parts.all_parts_count+=1;
+        }else if known_missing_files.contains(&file) {
+            parts.all_parts_count+=1;
+        }else if part==0 {
+            return Err(anyhow::anyhow!("Iniital video file not found"));
+        }else{
+            break;
+        }
+    }
+
+    return Ok(parts);
+}
+
 fn filetype(ext: &str) -> Result<crate::helpers::JsonFileInfoTypes<'_>> {
     match ext {
         "THM" => Ok(JsonFileInfoTypes{ file_type:"image-preview",item_type:"video" }),
@@ -106,7 +132,10 @@ impl SourceMediaInterface for GoProInterface {
                             }
                         }
                     }
-                    return Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?)));
+
+                    let part_count = count_gopro_parts(&PathBuf::from(path), &known_missing_files).unwrap();
+
+                    return Ok(Some(create_part_file(path.to_string(), filetype(ext.unwrap())?, part_count.existing_parts_count, 1)));
                 }
                 Some("JPG") => Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?))),
                 Some("MP4") | Some("GPR") | Some("LRV") | Some("WAV") => Ok(None),
@@ -127,7 +156,10 @@ impl SourceMediaInterface for GoProInterface {
                             }
                         }
                     }
-                    return Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?)));
+
+                    let part_count = count_gopro_parts(&PathBuf::from(path), &known_missing_files).unwrap();
+
+                    return Ok(Some(create_part_file(path.to_string(), filetype(ext.unwrap())?, part_count.existing_parts_count, 1)));
                 }
                 Some("GPR") | Some ("JPG") => {
                     if ext == Some("GPR") || !create_gopro_photo_file(&PathBuf::from(path), GoProPhotoFileType::RawPhoto).unwrap().exists() {
@@ -151,20 +183,9 @@ impl SourceMediaInterface for GoProInterface {
         match ext {
             Some("THM")|Some("MP4")|Some("WAV")|Some("LRV") => {
 
-                let mut part_count:u8 = 0;
+                let part_count = count_gopro_parts(source_media_file, &known_missing_files).unwrap();
 
-                for part in 1..=99 {
-                    let file = create_gopro_video_file(source_media_file,part,GoProVideoFileType::HighBitrateVideo)?;
-                    if file.exists() || known_missing_files.contains(&file) {
-                        part_count+=1;
-                    }else if part_count==0 {
-                        return Err(anyhow::anyhow!("Iniital video file not found"));
-                    }else{
-                        break;
-                    }
-                }
-
-                for part in 1..=part_count {
+                for part in 1..=part_count.all_parts_count {
                     let video_types = [
                         (GoProVideoFileType::HighBitrateVideo, false),
                         (GoProVideoFileType::LowBitrateVideo,  false),
@@ -175,11 +196,11 @@ impl SourceMediaInterface for GoProInterface {
                     for (file_type_enum, optional) in video_types {
                         let file = create_gopro_video_file(source_media_file, part, file_type_enum)?;
                         if optional {
-                            if let Some(item) = create_part_file_if_exists(&file, filetype(file.extension().unwrap().to_str().unwrap())?, part_count, part) {
+                            if let Some(item) = create_part_file_if_exists(&file, filetype(file.extension().unwrap().to_str().unwrap())?, part_count.all_parts_count, part) {
                                 items.push(item);
                             }
                         } else {
-                            if let Some(item) = create_part_file_that_exists(&file, filetype(file.extension().unwrap().to_str().unwrap())?, part_count, part, &known_missing_files)?{
+                            if let Some(item) = create_part_file_that_exists(&file, filetype(file.extension().unwrap().to_str().unwrap())?, part_count.all_parts_count, part, &known_missing_files)?{
                                 items.push(item);
                             }
                         }
