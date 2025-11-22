@@ -185,6 +185,7 @@ impl SourceMediaInterface for GoProInterface {
 
                 let part_count = count_gopro_parts(source_media_file, &known_missing_files).unwrap();
 
+                let mut existing_part_number:u8 = 1;
                 for part in 1..=part_count.all_parts_count {
                     let video_types = [
                         (GoProVideoFileType::HighBitrateVideo, false),
@@ -193,17 +194,23 @@ impl SourceMediaInterface for GoProInterface {
                         (GoProVideoFileType::WavAudio,         true ),
                     ];
 
+                    let mut existed=false;
                     for (file_type_enum, optional) in video_types {
                         let file = create_gopro_video_file(source_media_file, part, file_type_enum)?;
                         if optional {
-                            if let Some(item) = create_part_file_if_exists(&file, filetype(file.extension().unwrap().to_str().unwrap())?, part_count.all_parts_count, part) {
+                            if let Some(item) = create_part_file_if_exists(&file, filetype(file.extension().unwrap().to_str().unwrap())?, part_count.existing_parts_count, existing_part_number) {
                                 items.push(item);
+                                existed=true;
                             }
                         } else {
-                            if let Some(item) = create_part_file_that_exists(&file, filetype(file.extension().unwrap().to_str().unwrap())?, part_count.all_parts_count, part, &known_missing_files)?{
+                            if let Some(item) = create_part_file_that_exists(&file, filetype(file.extension().unwrap().to_str().unwrap())?, part_count.existing_parts_count, existing_part_number, &known_missing_files)?{
                                 items.push(item);
+                                existed=true;
                             }
                         }
+                    }
+                    if existed {
+                        existing_part_number+=1;
                     }
                 }
             },
