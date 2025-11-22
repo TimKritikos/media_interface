@@ -30,7 +30,7 @@ impl SourceMediaInterface for GenericSingleFileItem {
                               let types=filetype(ext.unwrap())?;
                               match types.file_type{
                                 FileVideo => Ok(Some(create_part_file(path.to_string(), types,1,1))),
-                                FileImage => Ok(Some(create_simple_file(path.to_string(), types))),
+                                FileImage => Ok(Some(create_simple_file(path.to_string(), types)?)),
                                 _ => Err(anyhow::anyhow!("unexpected file type")),
                               }
                           }
@@ -48,7 +48,7 @@ impl SourceMediaInterface for GenericSingleFileItem {
         let types=filetype(source_media_file.extension().unwrap().to_string_lossy().as_ref())?;
         match types.file_type{
             FileVideo => Ok(vec![create_part_file(source_media_file.to_string_lossy().into_owned(), types,1,1)]),
-            FileImage => Ok(vec![create_simple_file(source_media_file.to_string_lossy().into_owned(), types)]),
+            FileImage => Ok(vec![create_simple_file(source_media_file.to_string_lossy().into_owned(), types)?]),
             _ => Err(anyhow::anyhow!("unexpected file type")),
         }
     }

@@ -139,7 +139,7 @@ impl SourceMediaInterface for GoProInterface {
 
                     return Ok(Some(create_part_file(path.to_string(), filetype(ext.unwrap())?, part_count.existing_parts_count, 1)));
                 }
-                Some("JPG") => Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?))),
+                Some("JPG") => Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?)?)),
                 Some("MP4") | Some("GPR") | Some("LRV") | Some("WAV") => Ok(None),
                 Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path)),
             }
@@ -165,7 +165,7 @@ impl SourceMediaInterface for GoProInterface {
                 }
                 Some("GPR") | Some ("JPG") => {
                     if ext == Some("GPR") || !create_gopro_photo_file(&PathBuf::from(path), GoProPhotoFileType::RawPhoto).unwrap().exists() {
-                        return Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?)))
+                        return Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?)?))
                     }
                     return Ok(None);
                 }
@@ -219,7 +219,7 @@ impl SourceMediaInterface for GoProInterface {
             Some("JPG")|Some("GPR") => {
                 for file_type_enum in [GoProPhotoFileType::JpegPhoto,GoProPhotoFileType::RawPhoto] {
                     let file = create_gopro_photo_file(source_media_file, file_type_enum)?;
-                    if let Some(v) = create_simple_file_if_exists(&file, filetype(file.extension().unwrap().to_str().unwrap())?) {
+                    if let Some(v) = create_simple_file_if_exists(&file, filetype(file.extension().unwrap().to_str().unwrap())?).unwrap() {
                         items.push(v);
                     }
                 }

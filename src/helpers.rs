@@ -49,6 +49,7 @@ pub enum FileType{
    FileAudio,
 }
 
+#[derive(PartialEq)]
 pub enum ItemType{
     ItemVideo,
     ItemImage,
@@ -60,17 +61,17 @@ pub struct JsonFileInfoTypes{
     pub item_type: ItemType,
 }
 
-pub fn create_simple_file_if_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes) -> Option<FileItem> {
+pub fn create_simple_file_if_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes) -> Result<Option<FileItem>> {
     if file_path.exists(){
-        Some(create_simple_file(file_path.to_string_lossy().into_owned(),json_file_info))
+        Ok(Some(create_simple_file(file_path.to_string_lossy().into_owned(),json_file_info).unwrap()))
     }else{
-        None
+        Ok(None)
     }
 }
 
 //pub fn create_simple_file_that_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes) -> Result<FileItem> {
 //    if file_path.exists(){
-//        Ok(create_simple_file(file_path.to_string_lossy().into_owned(),json_file_info))
+//        Ok(create_simple_file(file_path.to_string_lossy().into_owned(),json_file_info).unwrap())
 //    }else{
 //        Err(anyhow::anyhow!("File {:?} expected to exist", file_path.to_string_lossy().into_owned()))
 //    }
@@ -96,7 +97,14 @@ pub fn create_part_file_that_exists(file_path:&PathBuf, json_file_info: JsonFile
     }
 }
 
-pub fn create_simple_file(file_path:String, json_file_info: JsonFileInfoTypes) -> FileItem {
+pub fn create_simple_file(file_path:String, json_file_info: JsonFileInfoTypes) -> Result<FileItem> {
+    if json_file_info.item_type == ItemType::ItemVideo { // TODO: Make this a compile time check
+        return Err(anyhow::anyhow!("Internal error: Tried to generate simple file for video item"));
+    }
+    return Ok(create_simple_file_unchecked(file_path,json_file_info));
+}
+
+fn create_simple_file_unchecked(file_path:String, json_file_info: JsonFileInfoTypes) -> FileItem {
     FileItem{
         file_path:file_path,
         file_type:match json_file_info.file_type{
@@ -119,7 +127,7 @@ pub fn create_simple_file(file_path:String, json_file_info: JsonFileInfoTypes) -
 }
 
 pub fn create_part_file(file_path:String, json_file_info: JsonFileInfoTypes, part_count:u8, part_num:u8) -> FileItem {
-    let mut ret=create_simple_file(file_path,json_file_info);
+    let mut ret=create_simple_file_unchecked(file_path,json_file_info);
     ret.part_count=Some(part_count);
     ret.part_num=Some(part_num);
     return ret;
