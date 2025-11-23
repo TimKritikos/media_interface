@@ -137,7 +137,7 @@ impl SourceMediaInterface for GoProInterface {
 
                     let part_count = count_gopro_parts(&PathBuf::from(path), &known_missing_files).unwrap();
 
-                    return Ok(Some(create_part_file(path.to_string(), filetype(ext.unwrap())?, part_count.existing_parts_count, 1)));
+                    return Ok(Some(create_part_file(path.to_string(), filetype(ext.unwrap())?, part_count.existing_parts_count, 1, Some(PathBuf::from(path).with_extension("MP4").to_string_lossy().into_owned()))));
                 }
                 Some("JPG") => Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?)?)),
                 Some("MP4") | Some("GPR") | Some("LRV") | Some("WAV") => Ok(None),
@@ -161,7 +161,7 @@ impl SourceMediaInterface for GoProInterface {
 
                     let part_count = count_gopro_parts(&PathBuf::from(path), &known_missing_files).unwrap();
 
-                    return Ok(Some(create_part_file(path.to_string(), filetype(ext.unwrap())?, part_count.existing_parts_count, 1)));
+                    return Ok(Some(create_part_file(path.to_string(), filetype(ext.unwrap())?, part_count.existing_parts_count, 1, Some(path.to_string()))));
                 }
                 Some("GPR") | Some ("JPG") => {
                     if ext == Some("GPR") || !create_gopro_photo_file(&PathBuf::from(path), GoProPhotoFileType::RawPhoto).unwrap().exists() {
@@ -200,12 +200,12 @@ impl SourceMediaInterface for GoProInterface {
                     for (file_type_enum, optional) in video_types {
                         let file = create_gopro_video_file(source_media_file, part, file_type_enum)?;
                         if optional {
-                            if let Some(item) = create_part_file_if_exists(&file, filetype(file.extension().unwrap().to_str().unwrap())?, part_count.existing_parts_count, existing_part_number) {
+                            if let Some(item) = create_part_file_if_exists(&file, filetype(file.extension().unwrap().to_str().unwrap())?, part_count.existing_parts_count, existing_part_number, None) {
                                 items.push(item);
                                 existed=true;
                             }
                         } else {
-                            if let Some(item) = create_part_file_that_exists(&file, filetype(file.extension().unwrap().to_str().unwrap())?, part_count.existing_parts_count, existing_part_number, &known_missing_files)?{
+                            if let Some(item) = create_part_file_that_exists(&file, filetype(file.extension().unwrap().to_str().unwrap())?, part_count.existing_parts_count, existing_part_number,None, &known_missing_files)?{
                                 items.push(item);
                                 existed=true;
                             }

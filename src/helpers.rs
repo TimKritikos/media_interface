@@ -77,17 +77,17 @@ pub fn create_simple_file_if_exists(file_path:&PathBuf, json_file_info: JsonFile
 //    }
 //}
 
-pub fn create_part_file_if_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes, part_count:u8, part_num:u8) -> Option<FileItem> {
+pub fn create_part_file_if_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes, part_count:u8, part_num:u8, metadata_file:Option<String>) -> Option<FileItem> {
     if file_path.exists(){
-        Some(create_part_file(file_path.to_string_lossy().into_owned(),json_file_info,part_count,part_num))
+        Some(create_part_file(file_path.to_string_lossy().into_owned(),json_file_info,part_count,part_num,metadata_file))
     }else{
         None
     }
 }
 
-pub fn create_part_file_that_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes, part_count:u8, part_num:u8, known_missing_files: &Vec<PathBuf>) -> Result<Option<FileItem>> {
+pub fn create_part_file_that_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes, part_count:u8, part_num:u8, metadata_file:Option<String>, known_missing_files: &Vec<PathBuf>) -> Result<Option<FileItem>> {
     if file_path.exists(){
-        Ok(Some(create_part_file(file_path.to_string_lossy().into_owned(),json_file_info,part_count,part_num)))
+        Ok(Some(create_part_file(file_path.to_string_lossy().into_owned(),json_file_info,part_count,part_num,metadata_file)))
     }else{
         if known_missing_files.contains(&file_path){
             Ok(None)
@@ -123,13 +123,15 @@ fn create_simple_file_unchecked(file_path:String, json_file_info: JsonFileInfoTy
         }.to_string(),
         part_count:None,
         part_num:None,
+        metadata_file:None,
     }
 }
 
-pub fn create_part_file(file_path:String, json_file_info: JsonFileInfoTypes, part_count:u8, part_num:u8) -> FileItem {
+pub fn create_part_file(file_path:String, json_file_info: JsonFileInfoTypes, part_count:u8, part_num:u8, metadata_file:Option<String>) -> FileItem {
     let mut ret=create_simple_file_unchecked(file_path,json_file_info);
     ret.part_count=Some(part_count);
     ret.part_num=Some(part_num);
+    ret.metadata_file=metadata_file;
     return ret;
 }
 

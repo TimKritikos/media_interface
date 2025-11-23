@@ -119,6 +119,8 @@ struct FileItem {
     part_count: Option<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     part_num: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata_file: Option<String>,
 }
 
 //////////
