@@ -7,11 +7,11 @@ use crate::helpers::FileType::*;
 
 pub fn for_each_file_type<F>(dir: &Path, mut f: F) -> Result<()>
 where
-    F: FnMut(&std::path::Path, String, String, Option<&str>) -> Result<()>,
+    F: FnMut(&PathBuf, String, String, Option<&str>) -> Result<()>,
 {
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
-        let path = entry.path();
+        let path = PathBuf::from(entry.path());
 
         let ext = path
             .extension()
@@ -135,18 +135,20 @@ pub fn create_part_file(file_path:String, json_file_info: JsonFileInfoTypes, par
     return ret;
 }
 
-pub fn filter_top_level_dir<F>(source_dir: &Path, mut filter: F) -> Result<Vec<FileItem>>
+pub fn filter_dir<F>(source_dir: &Path, mut filter: F) -> Result<Vec<FileItem>>
 where
-    F:FnMut(&str, Option<&str>, &str)->Result<Option<FileItem>>,
+    F:FnMut(&str, Option<&str>, &PathBuf, &str)->Result<Option<FileItem>>,
 {
     let mut items = Vec::<FileItem>::new();
 
-    for_each_file_type(source_dir, |_path:&Path, filename: String, path_str: String, ext: Option<&str>| {
-        if let Some(item) = filter(&filename, ext, &path_str)? {
-            items.push(item);
+    for_each_file_type(source_dir,
+        |path:&PathBuf, filename: String, path_str: String, ext: Option<&str>| {
+            if let Some(item) = filter(&filename, ext, path, &path_str)? {
+                items.push(item);
+            }
+            Ok(())
         }
-        Ok(())
-    })
+    )
     .map_err(|err| anyhow::anyhow!("Error traversing directory: {}", err))?;
 
     Ok(items)

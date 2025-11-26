@@ -21,7 +21,7 @@ fn filetype(ext: &str) -> Result<crate::helpers::JsonFileInfoTypes> {
 
 impl SourceMediaInterface for GenericSingleFileItem {
     fn list_thumbnail(&self, _source_media_location: &PathBuf,  source_media_card: &PathBuf, _known_missing_files: Vec<PathBuf> ) -> Result<Vec<FileItem>> {
-        filter_top_level_dir(source_media_card.as_path(),|_filename: &str, ext: Option<&str>, path: &str|{
+        filter_dir(source_media_card.as_path(),|_filename: &str, ext: Option<&str>, _path: &PathBuf, path_str: &str|{
             match ext {
                 Some(a) => {
                     match a.to_lowercase().as_str() {
@@ -29,15 +29,15 @@ impl SourceMediaInterface for GenericSingleFileItem {
                           => {
                               let types=filetype(ext.unwrap())?;
                               match types.file_type{
-                                FileVideo => Ok(Some(create_part_file(path.to_string(), types,1,1,None))),
-                                FileImage => Ok(Some(create_simple_file(path.to_string(), types)?)),
+                                FileVideo => Ok(Some(create_part_file(path_str.to_string(), types,1,1,None))),
+                                FileImage => Ok(Some(create_simple_file(path_str.to_string(), types)?)),
                                 _ => Err(anyhow::anyhow!("unexpected file type")),
                               }
                           }
-                        _ => Err(anyhow::anyhow!("File has no extension {}", path)),
+                        _ => Err(anyhow::anyhow!("File has no extension {}", path_str)),
                     }
                 }
-                None => Err(anyhow::anyhow!("File has no extension {}", path)),
+                None => Err(anyhow::anyhow!("File has no extension {}", path_str)),
             }
         })
     }

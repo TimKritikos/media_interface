@@ -122,55 +122,55 @@ fn filetype(ext: &str) -> Result<crate::helpers::JsonFileInfoTypes> {
 
 impl SourceMediaInterface for GoProInterface {
     fn list_thumbnail( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>> {
-        filter_top_level_dir(source_media_card.as_path(),|filename: &str, ext: Option<&str>, path: &str|{
+        filter_dir(source_media_card.as_path(),|filename: &str, ext: Option<&str>, path: &PathBuf, path_str: &str|{
             match ext {
                 Some("THM") => {
                     let part_id = get_gopro_video_part_id(filename.to_string())?;
                     if part_id != 1 {
                         for n in 1..part_id{
-                            let n_file=create_gopro_video_file(&PathBuf::from(path),n,GoProVideoFileType::HighBitrateVideo)?;
+                            let n_file=create_gopro_video_file(&path,n,GoProVideoFileType::HighBitrateVideo)?;
                             if ! known_missing_files.contains(&n_file){
                                 return Ok(None);
                             }
                         }
                     }
 
-                    let part_count = count_gopro_parts(&PathBuf::from(path), &known_missing_files).unwrap();
+                    let part_count = count_gopro_parts(&path, &known_missing_files).unwrap();
 
-                    return Ok(Some(create_part_file(path.to_string(), filetype(ext.unwrap())?, part_count.existing_parts_count, 1, Some(PathBuf::from(path).with_extension("MP4").to_string_lossy().into_owned()))));
+                    return Ok(Some(create_part_file(path_str.to_string(), filetype(ext.unwrap())?, part_count.existing_parts_count, 1, Some(path.with_extension("MP4").to_string_lossy().into_owned()))));
                 }
-                Some("JPG") => Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?)?)),
+                Some("JPG") => Ok(Some(create_simple_file(path_str.to_string(), filetype(ext.unwrap())?)?)),
                 Some("MP4") | Some("GPR") | Some("LRV") | Some("WAV") => Ok(None),
-                Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path)),
+                Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path_str)),
             }
         })
     }
     fn list_high_quality( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>> {
-        filter_top_level_dir(source_media_card.as_path(),|filename: &str, ext: Option<&str>, path: &str|{
+        filter_dir(source_media_card.as_path(),|filename: &str, ext: Option<&str>, path: &PathBuf, path_str: &str|{
             match ext {
                 Some("MP4") => {
                     let part_id = get_gopro_video_part_id(filename.to_string())?;
                     if part_id != 1 {
                         for n in 1..part_id{
-                            let n_file=create_gopro_video_file(&PathBuf::from(path),n,GoProVideoFileType::HighBitrateVideo)?;
+                            let n_file=create_gopro_video_file(&path,n,GoProVideoFileType::HighBitrateVideo)?;
                             if ! known_missing_files.contains(&n_file){
                                 return Ok(None);
                             }
                         }
                     }
 
-                    let part_count = count_gopro_parts(&PathBuf::from(path), &known_missing_files).unwrap();
+                    let part_count = count_gopro_parts(&path, &known_missing_files).unwrap();
 
-                    return Ok(Some(create_part_file(path.to_string(), filetype(ext.unwrap())?, part_count.existing_parts_count, 1, Some(path.to_string()))));
+                    return Ok(Some(create_part_file(path_str.to_string(), filetype(ext.unwrap())?, part_count.existing_parts_count, 1, Some(path_str.to_string()))));
                 }
                 Some("GPR") | Some ("JPG") => {
-                    if ext == Some("GPR") || !create_gopro_photo_file(&PathBuf::from(path), GoProPhotoFileType::RawPhoto).unwrap().exists() {
-                        return Ok(Some(create_simple_file(path.to_string(), filetype(ext.unwrap())?)?))
+                    if ext == Some("GPR") || !create_gopro_photo_file(path, GoProPhotoFileType::RawPhoto).unwrap().exists() {
+                        return Ok(Some(create_simple_file(path_str.to_string(), filetype(ext.unwrap())?)?))
                     }
                     return Ok(None);
                 }
                 Some("THM") | Some("LRV") | Some("WAV") => Ok(None),
-                Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path)),
+                Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path_str)),
             }
         })
     }
