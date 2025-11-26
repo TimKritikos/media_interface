@@ -47,6 +47,8 @@ pub enum FileType{
    FileImageRaw,
 
    FileAudio,
+
+   FileMetadata,
 }
 
 #[derive(PartialEq)]
@@ -115,6 +117,7 @@ fn create_simple_file_unchecked(file_path:String, json_file_info: JsonFileInfoTy
             FileImagePreview  => "image-preview",
             FileImageRaw      => "image-raw",
             FileAudio          => "audio",
+            FileMetadata      => "metadata",
         }.to_string(),
         item_type:match json_file_info.item_type{
             ItemVideo => "video",
