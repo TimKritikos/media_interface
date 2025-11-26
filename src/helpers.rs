@@ -71,11 +71,15 @@ pub fn create_simple_file_if_exists(file_path:&PathBuf, json_file_info: JsonFile
     }
 }
 
-//pub fn create_simple_file_that_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes) -> Result<FileItem> {
+//pub fn create_simple_file_that_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes, known_missing_files: &Vec<PathBuf>) -> Result<Option<FileItem>> {
 //    if file_path.exists(){
-//        Ok(create_simple_file(file_path.to_string_lossy().into_owned(),json_file_info).unwrap())
+//        Ok(Some(create_simple_file(file_path.to_string_lossy().into_owned(),json_file_info).unwrap()))
 //    }else{
-//        Err(anyhow::anyhow!("File {:?} expected to exist", file_path.to_string_lossy().into_owned()))
+//        if known_missing_files.contains(&file_path){
+//            Ok(None)
+//        }else{
+//            Err(anyhow::anyhow!("File {:?} expected to exist", file_path.to_string_lossy().into_owned()))
+//        }
 //    }
 //}
 
