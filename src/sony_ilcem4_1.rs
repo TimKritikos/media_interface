@@ -7,8 +7,6 @@ use crate::helpers::ItemType::*;
 use crate::helpers::FileType::*;
 use std::fs;
 
-//TODO: acknoledge known_missing_files
-
 fn filetype(file: &PathBuf, source_media_location: &PathBuf) -> Result<crate::helpers::JsonFileInfoTypes> {
         if  file.parent().unwrap().parent().unwrap().file_name().unwrap().to_str().unwrap() == "DCIM" &&
             file.parent().unwrap().parent().unwrap().parent().unwrap().parent().unwrap() == source_media_location &&
@@ -70,6 +68,8 @@ fn create_video_file( input_file:&PathBuf, id:&String, file_type:VideoFiles ) ->
 pub struct SonyInterface;
 
 impl SourceMediaInterface for SonyInterface {
+    //TODO: handle case where the thumbnail is in the known missing files and the item needs to be
+    //represented by something else
     fn list_thumbnail(&self,  source_media_location: &PathBuf,  source_media_card: &PathBuf, _known_missing_files: Vec<PathBuf> ) -> Result<Vec<FileItem>> {
         let mut files=Vec::<FileItem>::new();
         let dcim=source_media_card.join("DCIM/");

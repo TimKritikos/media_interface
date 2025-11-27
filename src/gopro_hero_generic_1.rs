@@ -121,6 +121,8 @@ fn filetype(ext: &str) -> Result<crate::helpers::JsonFileInfoTypes> {
 }
 
 impl SourceMediaInterface for GoProInterface {
+    //TODO: handle case where the thumbnail is in the known missing files and the item needs to be
+    //represented by something else
     fn list_thumbnail( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>> {
         filter_dir(source_media_card.as_path(),|filename: &str, ext: Option<&str>, path: &PathBuf, path_str: &str|{
             match ext {
