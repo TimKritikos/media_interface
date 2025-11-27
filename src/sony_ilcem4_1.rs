@@ -71,24 +71,27 @@ pub struct SonyInterface;
 
 impl SourceMediaInterface for SonyInterface {
     fn list_thumbnail(&self,  source_media_location: &PathBuf,  source_media_card: &PathBuf, _known_missing_files: Vec<PathBuf> ) -> Result<Vec<FileItem>> {
-        let mut images=Vec::<FileItem>::new();
-        for imagedir in fs::read_dir(source_media_card.join("DCIM/"))? {
-             let mut image_set=filter_dir(&imagedir?.path(),|_filename: &str, ext: Option<&str>, path:&PathBuf, path_str: &str|{
-                match ext {
-                    Some("ARW") => {
-                        if ! path.with_extension("JPG").exists(){
-                            Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?)?))
-                        }else{
-                            Ok(None)
+        let mut files=Vec::<FileItem>::new();
+        let dcim=source_media_card.join("DCIM/");
+        if dcim.exists(){
+            for imagedir in fs::read_dir(dcim)? {
+                 let mut image_set=filter_dir(&imagedir?.path(),|_filename: &str, ext: Option<&str>, path:&PathBuf, path_str: &str|{
+                    match ext {
+                        Some("ARW") => {
+                            if ! path.with_extension("JPG").exists(){
+                                Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?)?))
+                            }else{
+                                Ok(None)
+                            }
                         }
+                        Some("JPG") => {
+                            Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?)?))
+                        }
+                        Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path_str)),
                     }
-                    Some("JPG") => {
-                        Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?)?))
-                    }
-                    Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path_str)),
-                }
-            })?;
-             images.append(&mut image_set);
+                })?;
+                 files.append(&mut image_set);
+            }
         }
         let mut videos=filter_dir(source_media_card.join("PRIVATE/M4ROOT/THMBNL/").as_path(),|_filename: &str, ext: Option<&str>, path:&PathBuf, path_str: &str|{
             match ext {
@@ -98,28 +101,31 @@ impl SourceMediaInterface for SonyInterface {
                 Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path_str)),
             }
         })?;
-        images.append(&mut videos);
-        return Ok(images);
+        files.append(&mut videos);
+        return Ok(files);
     }
     fn list_high_quality(&self,  source_media_location: &PathBuf, source_media_card: &PathBuf, _known_missing_files: Vec<PathBuf> ) -> Result<Vec<FileItem>> {
-        let mut images=Vec::<FileItem>::new();
-        for imagedir in fs::read_dir(source_media_card.join("DCIM/"))? {
-             let mut image_set=filter_dir(&imagedir?.path(),|_filename: &str, ext: Option<&str>, path:&PathBuf, path_str: &str|{
-                match ext {
-                    Some("JPG") => {
-                        if ! path.with_extension("ARW").exists(){
-                            Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?)?))
-                        }else{
-                            Ok(None)
+        let mut files=Vec::<FileItem>::new();
+        let dcim=source_media_card.join("DCIM/");
+        if dcim.exists(){
+            for imagedir in fs::read_dir(source_media_card.join(dcim))? {
+                 let mut image_set=filter_dir(&imagedir?.path(),|_filename: &str, ext: Option<&str>, path:&PathBuf, path_str: &str|{
+                    match ext {
+                        Some("JPG") => {
+                            if ! path.with_extension("ARW").exists(){
+                                Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?)?))
+                            }else{
+                                Ok(None)
+                            }
                         }
+                        Some("ARW") => {
+                            Ok(Some(create_simple_file(path_str.to_string(), filetype(path,source_media_location)?)?))
+                        }
+                        Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path_str)),
                     }
-                    Some("ARW") => {
-                        Ok(Some(create_simple_file(path_str.to_string(), filetype(path,source_media_location)?)?))
-                    }
-                    Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path_str)),
-                }
-            })?;
-             images.append(&mut image_set);
+                })?;
+                 files.append(&mut image_set);
+            }
         }
         let mut videos=filter_dir(source_media_card.join("PRIVATE/M4ROOT/CLIP/").as_path(),|_filename: &str, ext: Option<&str>, path:&PathBuf, path_str: &str|{
             match ext {
@@ -130,8 +136,8 @@ impl SourceMediaInterface for SonyInterface {
                 Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path_str)),
             }
         })?;
-        images.append(&mut videos);
-        return Ok(images);
+        files.append(&mut videos);
+        return Ok(files);
     }
     fn get_related(&self, source_media_location: &PathBuf, source_media_file: &PathBuf, known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>>{
         let mut items = Vec::<FileItem>::new();
