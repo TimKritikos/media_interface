@@ -34,7 +34,7 @@ impl SourceMediaInterface for GenericSingleFileItem {
                                 _ => Err(anyhow::anyhow!("unexpected file type")),
                               }
                           }
-                        _ => Err(anyhow::anyhow!("File has no extension {}", path_str)),
+                        _ => Err(anyhow::anyhow!("Unrecognised extension {}", path_str)),
                     }
                 }
                 None => Err(anyhow::anyhow!("File has no extension {}", path_str)),
