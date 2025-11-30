@@ -49,6 +49,8 @@ pub enum FileType{
    FileAudio,
 
    FileMetadata,
+
+   FileGNSSTrack,
 }
 
 #[derive(PartialEq)]
@@ -56,6 +58,7 @@ pub enum ItemType{
     ItemVideo,
     ItemImage,
     ItemAudio,
+    ItemGNSSTrack,
 }
 
 pub struct JsonFileInfoTypes{
@@ -122,11 +125,13 @@ fn create_simple_file_unchecked(file_path:String, json_file_info: JsonFileInfoTy
             FileImageRaw      => "image-raw",
             FileAudio          => "audio",
             FileMetadata      => "metadata",
+            FileGNSSTrack     => "gnss-track"
         }.to_string(),
         item_type:match json_file_info.item_type{
             ItemVideo => "video",
             ItemImage => "image",
             ItemAudio => "audio",
+            ItemGNSSTrack =>  "gnss-track",
         }.to_string(),
         part_count:None,
         part_num:None,
