@@ -29,7 +29,7 @@ impl SourceMediaInterface for GenericSingleFileItem {
                           => {
                               let types=filetype(ext.unwrap())?;
                               match types.file_type{
-                                FileVideo => Ok(Some(create_part_file(path_str.to_string(), types,1,1,None))),
+                                FileVideo | FileAudio => Ok(Some(create_part_file(path_str.to_string(), types,1,1,None))),
                                 FileImage => Ok(Some(create_simple_file(path_str.to_string(), types)?)),
                                 _ => Err(anyhow::anyhow!("unexpected file type")),
                               }
