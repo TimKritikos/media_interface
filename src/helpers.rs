@@ -169,3 +169,7 @@ where
 pub fn osstr_to_str(os: &std::ffi::OsStr) -> Result<&str> {
     os.to_str().ok_or_else(|| anyhow!("Invalid UTF-8 in {:?}", os))
 }
+
+pub fn get_extension_str(file:&PathBuf) -> Result<&str> {
+    Ok(osstr_to_str(&file.extension().ok_or_else(|| anyhow!("File has no extension"))?)?)
+}
