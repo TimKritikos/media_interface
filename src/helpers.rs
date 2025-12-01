@@ -1,4 +1,4 @@
-use anyhow::{Result};
+use anyhow::{Result,anyhow};
 use std::path::{Path,PathBuf};
 use std::fs;
 use crate::FileItem;
@@ -164,4 +164,8 @@ where
     .map_err(|err| anyhow::anyhow!("Error traversing directory: {}", err))?;
 
     Ok(items)
+}
+
+pub fn osstr_to_str(os: &std::ffi::OsStr) -> Result<&str> {
+    os.to_str().ok_or_else(|| anyhow!("Invalid UTF-8 in {:?}", os))
 }
