@@ -1,9 +1,17 @@
-use anyhow::{Result,anyhow};
-use std::path::{Path,PathBuf};
+use anyhow::{Result, anyhow};
+use std::path::{Path, PathBuf};
 use std::fs;
 use crate::FileItem;
 use crate::helpers::ItemType::*;
 use crate::helpers::FileType::*;
+
+pub fn osstr_to_str(os: &std::ffi::OsStr) -> Result<&str> {
+    os.to_str().ok_or_else(|| anyhow!("Invalid UTF-8 in {:?}", os))
+}
+
+pub fn get_extension_str(file:&PathBuf) -> Result<&str> {
+    Ok(osstr_to_str(&file.extension().ok_or_else(|| anyhow!("File has no extension"))?)?)
+}
 
 pub fn for_each_file_type<F>(dir: &Path, mut f: F) -> Result<()>
 where
@@ -13,22 +21,14 @@ where
         let entry = entry?;
         let path = PathBuf::from(entry.path());
 
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str()); // Option<&str>
+        let ext = get_extension_str(&path).ok();
 
-        let path_str = path
-            .as_os_str()
-            .to_str()
-            .unwrap()
-            .to_string();
+        let path_str = osstr_to_str(path.as_os_str())?.to_string();
 
-        let filename = path
-            .file_name()
-            .unwrap()
-            .to_string_lossy().into_owned();
+        let filename = path.file_name().ok_or_else(|| anyhow!("Failed to get filename"))?;
+        let filename_str = osstr_to_str(filename)?.to_string();
 
-        match f(&path, filename, path_str, ext){
+        match f(&path, filename_str, path_str, ext){
             Ok(()) => {},
             Err(e) => { return Err(e); }
         }
@@ -68,7 +68,7 @@ pub struct JsonFileInfoTypes{
 
 pub fn create_simple_file_if_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes) -> Result<Option<FileItem>> {
     if file_path.exists(){
-        Ok(Some(create_simple_file(file_path.to_string_lossy().into_owned(),json_file_info).unwrap()))
+        Ok(Some(create_simple_file(file_path.to_string_lossy().into_owned(), json_file_info)?))
     }else{
         Ok(None)
     }
@@ -76,7 +76,7 @@ pub fn create_simple_file_if_exists(file_path:&PathBuf, json_file_info: JsonFile
 
 //pub fn create_simple_file_that_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes, known_missing_files: &Vec<PathBuf>) -> Result<Option<FileItem>> {
 //    if file_path.exists(){
-//        Ok(Some(create_simple_file(file_path.to_string_lossy().into_owned(),json_file_info).unwrap()))
+//        Ok(Some(create_simple_file(file_path.to_string_lossy().into_owned(), json_file_info)?))
 //    }else{
 //        if known_missing_files.contains(&file_path){
 //            Ok(None)
@@ -88,7 +88,7 @@ pub fn create_simple_file_if_exists(file_path:&PathBuf, json_file_info: JsonFile
 
 pub fn create_part_file_if_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes, part_count:u8, part_num:u8, metadata_file:Option<String>) -> Option<FileItem> {
     if file_path.exists(){
-        Some(create_part_file(file_path.to_string_lossy().into_owned(),json_file_info,part_count,part_num,metadata_file))
+        Some(create_part_file(file_path.to_string_lossy().into_owned(), json_file_info, part_count, part_num, metadata_file))
     }else{
         None
     }
@@ -96,7 +96,7 @@ pub fn create_part_file_if_exists(file_path:&PathBuf, json_file_info: JsonFileIn
 
 pub fn create_part_file_that_exists(file_path:&PathBuf, json_file_info: JsonFileInfoTypes, part_count:u8, part_num:u8, metadata_file:Option<String>, known_missing_files: &Vec<PathBuf>) -> Result<Option<FileItem>> {
     if file_path.exists(){
-        Ok(Some(create_part_file(file_path.to_string_lossy().into_owned(),json_file_info,part_count,part_num,metadata_file)))
+        Ok(Some(create_part_file(file_path.to_string_lossy().into_owned(), json_file_info, part_count, part_num, metadata_file)))
     }else{
         if known_missing_files.contains(&file_path){
             Ok(None)
@@ -110,40 +110,41 @@ pub fn create_simple_file(file_path:String, json_file_info: JsonFileInfoTypes) -
     if json_file_info.item_type == ItemType::ItemVideo { // TODO: Make this a compile time check
         return Err(anyhow::anyhow!("Internal error: Tried to generate simple file for video item"));
     }
-    return Ok(create_simple_file_unchecked(file_path,json_file_info));
+    return Ok(create_simple_file_unchecked(file_path, json_file_info));
 }
 
 fn create_simple_file_unchecked(file_path:String, json_file_info: JsonFileInfoTypes) -> FileItem {
     FileItem{
         file_path:file_path,
         file_type:match json_file_info.file_type{
-            FileVideo          => "video",
+            FileVideo         => "video",
             FileVideoPreview  => "video-preview",
             FileVideoRaw      => "video-raw",
-            FileImage          => "image",
+            FileImage         => "image",
             FileImagePreview  => "image-preview",
             FileImageRaw      => "image-raw",
-            FileAudio          => "audio",
+            FileAudio         => "audio",
             FileMetadata      => "metadata",
             FileGNSSTrack     => "gnss-track"
         }.to_string(),
         item_type:match json_file_info.item_type{
-            ItemVideo => "video",
-            ItemImage => "image",
-            ItemAudio => "audio",
-            ItemGNSSTrack =>  "gnss-track",
+            ItemVideo     => "video",
+            ItemImage     => "image",
+            ItemAudio     => "audio",
+            ItemGNSSTrack => "gnss-track",
         }.to_string(),
-        part_count:None,
-        part_num:None,
-        metadata_file:None,
+        part_count :    None,
+        part_num :      None,
+        metadata_file : None,
     }
 }
 
+
 pub fn create_part_file(file_path:String, json_file_info: JsonFileInfoTypes, part_count:u8, part_num:u8, metadata_file:Option<String>) -> FileItem {
-    let mut ret=create_simple_file_unchecked(file_path,json_file_info);
-    ret.part_count=Some(part_count);
-    ret.part_num=Some(part_num);
-    ret.metadata_file=metadata_file;
+    let mut ret = create_simple_file_unchecked(file_path, json_file_info);
+    ret.part_count = Some(part_count);
+    ret.part_num = Some(part_num);
+    ret.metadata_file = metadata_file;
     return ret;
 }
 
@@ -161,15 +162,7 @@ where
             Ok(())
         }
     )
-    .map_err(|err| anyhow::anyhow!("Error traversing directory: {}", err))?;
+    .map_err(|err| anyhow::anyhow!("Error filtering dir '{}': {}",source_dir.display(), err))?;
 
     Ok(items)
-}
-
-pub fn osstr_to_str(os: &std::ffi::OsStr) -> Result<&str> {
-    os.to_str().ok_or_else(|| anyhow!("Invalid UTF-8 in {:?}", os))
-}
-
-pub fn get_extension_str(file:&PathBuf) -> Result<&str> {
-    Ok(osstr_to_str(&file.extension().ok_or_else(|| anyhow!("File has no extension"))?)?)
 }
