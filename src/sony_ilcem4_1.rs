@@ -8,7 +8,7 @@ use crate::helpers::FileType::*;
 use std::fs;
 
 fn filetype(file: &PathBuf, source_media_location: &PathBuf) -> Result<crate::helpers::JsonFileInfoTypes> {
-    let extension = osstr_to_str(&file.extension().ok_or_else(|| anyhow!("File has no extension"))?)?;
+    let extension = get_extension_str(&file)?;
     let file_str = file.to_string_lossy();
     let parent_folder = file.parent().context("File has no parent directory")?;
     let grandparent_folder = parent_folder.parent().context("File has no grandparent directory")?;
@@ -97,7 +97,7 @@ impl SourceMediaInterface for SonyInterface {
         let dcim = source_media_card.join("DCIM/");
         if dcim.exists(){
             for imagedir in fs::read_dir(dcim)? {
-                 let mut image_set = filter_dir(&imagedir?.path(),|_filename: &str, ext: Option<&str>, path:&PathBuf, path_str: &str|{
+                let mut image_set = filter_dir(&imagedir?.path(),|_filename: &str, ext: Option<&str>, path:&PathBuf, path_str: &str|{
                     match ext {
                         Some("ARW") => {
                             if ! path.with_extension("JPG").exists(){
