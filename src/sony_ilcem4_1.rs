@@ -7,7 +7,7 @@ use crate::helpers::ItemType::*;
 use crate::helpers::FileType::*;
 use std::fs;
 
-fn filetype(file: &Path, source_media_location: &Path) -> Result<crate::helpers::JsonFileInfoTypes> {
+fn filetype(file: &Path, source_media_location: &Path) -> Result<JsonFileInfoTypes> {
     let extension = get_extension_str(file)?;
     let file_str = file.to_string_lossy();
     let parent_folder = file.parent().context("File has no parent directory")?;
@@ -25,7 +25,7 @@ fn filetype(file: &Path, source_media_location: &Path) -> Result<crate::helpers:
             return match extension{
                 "JPG" => Ok(JsonFileInfoTypes{ file_type:FileImage,    item_type:ItemImage }),
                 "ARW" => Ok(JsonFileInfoTypes{ file_type:FileImageRaw, item_type:ItemImage }),
-                _ => Err(anyhow::anyhow!("unexpected input file extension '{}' in file '{}'", extension, file_str))
+                _ => Err(anyhow!("unexpected input file extension '{}' in file '{}'", extension, file_str))
             }
         }
 
@@ -44,21 +44,21 @@ fn filetype(file: &Path, source_media_location: &Path) -> Result<crate::helpers:
                     match extension {
                         "MP4" => Ok(JsonFileInfoTypes{ file_type:FileVideo,    item_type:ItemVideo }),
                         "XML" => Ok(JsonFileInfoTypes{ file_type:FileMetadata, item_type:ItemVideo }),
-                        _ => Err(anyhow::anyhow!("unexpected input file extension '{}' in file '{}'", extension, file_str))
+                        _ => Err(anyhow!("unexpected input file extension '{}' in file '{}'", extension, file_str))
                     }
                 },
                 "THMBNL" => {
                     match extension {
                         "JPG" => Ok(JsonFileInfoTypes{ file_type:FileImagePreview, item_type:ItemVideo }),
-                        _ => Err(anyhow::anyhow!("unexpected input file extension '{}' in file '{}'", extension, file_str))
+                        _ => Err(anyhow!("unexpected input file extension '{}' in file '{}'", extension, file_str))
                     }
                 }
-                _ => Err(anyhow::anyhow!("File '{}' in M4ROOT directory has an invalid subfolder name '{}'", file_str, m4root_subfolder_name))
+                _ => Err(anyhow!("File '{}' in M4ROOT directory has an invalid subfolder name '{}'", file_str, m4root_subfolder_name))
             }
         }
     }
 
-    Err(anyhow::anyhow!("File path not in expected directory structure '{}'", file_str))
+    Err(anyhow!("File path not in expected directory structure '{}'", file_str))
 }
 
 enum VideoFiles{
@@ -109,7 +109,7 @@ impl SourceMediaInterface for SonyInterface {
                         Some("JPG") => {
                             Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?)?))
                         }
-                        Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path_str)),
+                        Some(_) | None => Err(anyhow!("Unexpected file {}", path_str)),
                     }
                 })?;
                  files.append(&mut image_set);
@@ -120,7 +120,7 @@ impl SourceMediaInterface for SonyInterface {
                 Some("JPG") => {
                     Ok(Some(create_part_file(path_str.to_string(), filetype(path, source_media_location)?, 1, 1, None)))
                 }
-                Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path_str)),
+                Some(_) | None => Err(anyhow!("Unexpected file {}", path_str)),
             }
         })?;
         files.append(&mut videos);
@@ -144,7 +144,7 @@ impl SourceMediaInterface for SonyInterface {
                         Some("ARW") => {
                             Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?)?))
                         }
-                        Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path_str)),
+                        Some(_) | None => Err(anyhow!("Unexpected file {}", path_str)),
                     }
                 })?;
                  files.append(&mut image_set);
@@ -156,7 +156,7 @@ impl SourceMediaInterface for SonyInterface {
                     Ok(Some(create_part_file(path_str.to_string(), filetype(path, source_media_location)?, 1, 1, None)))
                 }
                 Some("XML") => Ok(None),
-                Some(_) | None => Err(anyhow::anyhow!("Unexpected file {}", path_str)),
+                Some(_) | None => Err(anyhow!("Unexpected file {}", path_str)),
             }
         })?;
         files.append(&mut videos);
@@ -185,7 +185,7 @@ impl SourceMediaInterface for SonyInterface {
                     FileVideo => VideoFiles::Video,
                     FileImagePreview => VideoFiles::Thumbnail,
                     FileMetadata => VideoFiles::Metadata,
-                    _ => { return Err(anyhow::anyhow!("Internal error"))}
+                    _ => { return Err(anyhow!("Internal error"))}
                 };
 
                 let video_id = get_video_id(source_media_file, video_type)?;
@@ -200,7 +200,7 @@ impl SourceMediaInterface for SonyInterface {
                 Ok(items)
             }
             _ => {
-                Err(anyhow::anyhow!("Internal error"))
+                Err(anyhow!("Internal error"))
             }
         }
     }
