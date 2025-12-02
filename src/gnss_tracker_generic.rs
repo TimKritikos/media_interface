@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow};
 use crate::SourceMediaInterface;
-use std::path::{PathBuf};
+use std::path::{PathBuf,Path};
 use crate::helpers::*;
 use crate::FileItem;
 use crate::helpers::ItemType::*;
@@ -14,8 +14,8 @@ const FILE_TYPES: JsonFileInfoTypes = JsonFileInfoTypes {
 };
 
 impl SourceMediaInterface for GNSSTrackerGeneric {
-    fn list_thumbnail(&self, _source_media_location: &PathBuf,  source_media_card: &PathBuf, _known_missing_files: Vec<PathBuf> ) -> Result<Vec<FileItem>> {
-        filter_dir(source_media_card.as_path(),|_filename: &str, input_ext: Option<&str>, path: &PathBuf, path_str: &str|{
+    fn list_thumbnail(&self, _source_media_location: &Path,  source_media_card: &Path, _known_missing_files: Vec<PathBuf> ) -> Result<Vec<FileItem>> {
+        filter_dir(source_media_card,|_filename: &str, input_ext: Option<&str>, path: &PathBuf, path_str: &str|{
             let ext = input_ext.ok_or_else(|| anyhow!("Expected filter_dir to provide a file extension"))?;
             match ext.to_lowercase().as_str() {
                 "gpx" => {
@@ -39,10 +39,10 @@ impl SourceMediaInterface for GNSSTrackerGeneric {
             }
         })
     }
-    fn list_high_quality(&self,  source_media_location: &PathBuf,  source_media_card: &PathBuf, known_missing_files: Vec<PathBuf> ) -> Result<Vec<FileItem>> {
+    fn list_high_quality(&self,  source_media_location: &Path,  source_media_card: &Path, known_missing_files: Vec<PathBuf> ) -> Result<Vec<FileItem>> {
         self.list_thumbnail(source_media_location, source_media_card, known_missing_files)
     }
-    fn get_related(&self, _source_media_location: &PathBuf, source_media_file: &PathBuf, _known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>>{
+    fn get_related(&self, _source_media_location: &Path, source_media_file: &Path, _known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>>{
         let mut items = Vec::<FileItem>::new();
 
         for extension in ["gpx", "kml", "txt"]{
@@ -51,9 +51,9 @@ impl SourceMediaInterface for GNSSTrackerGeneric {
             }
         }
 
-        return Ok(items)
+        Ok(items)
     }
     fn name(&self) -> String {
-        return "GNSS-Tracker-Generic".to_string()
+        "GNSS-Tracker-Generic".to_string()
     }
 }

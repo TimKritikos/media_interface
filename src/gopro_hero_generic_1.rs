@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow, Context};
 use crate::SourceMediaInterface;
-use std::path::{PathBuf};
+use std::path::{PathBuf,Path};
 use crate::helpers::*;
 use crate::FileItem;
 use crate::helpers::ItemType::*;
@@ -29,11 +29,12 @@ enum GoProPhotoFileType{
     RawPhoto,
 }
 
-fn create_gopro_photo_file(input_file:&PathBuf, file_type: GoProPhotoFileType ) -> Result<PathBuf> {
+fn create_gopro_photo_file(input_file:&Path, file_type: GoProPhotoFileType ) -> Result<PathBuf> {
 
-    let input_filename = input_file.as_path().file_name().ok_or_else(|| anyhow!("Couldn't get filename of reference photo file"))?.to_string_lossy();
+    let input_filename = input_file.file_name().ok_or_else(|| anyhow!("Couldn't get filename of reference photo file"))?.to_string_lossy();
 
     let (name, _) = input_filename.rsplit_once('.').ok_or_else(|| anyhow!("Failed to split gopro style filename from it's extension {:?}", input_filename))?;
+    #[allow(clippy::len_zero)] // This will be removed when the value changes
     if name.len() < 1 {
         return Err(anyhow!("Input gopro style filename without the extension was not long enough {:?}", name));
     }
@@ -47,9 +48,9 @@ fn create_gopro_photo_file(input_file:&PathBuf, file_type: GoProPhotoFileType ) 
     Ok(input_dirname.join(format!("{name}.{new_extension}")))
 }
 
-fn create_gopro_video_file(input_file:&PathBuf, part:u8, file_type: GoProVideoFileType ) -> Result<PathBuf> {
+fn create_gopro_video_file(input_file:&Path, part:u8, file_type: GoProVideoFileType ) -> Result<PathBuf> {
 
-    let input_filename = input_file.as_path().file_name().ok_or_else(|| anyhow!("Couldn't get filename of reference photo file"))?.to_string_lossy();
+    let input_filename = input_file.file_name().ok_or_else(|| anyhow!("Couldn't get filename of reference photo file"))?.to_string_lossy();
 
     let (name, _) = input_filename.rsplit_once('.').ok_or_else(|| anyhow!("Failed to split gopro style filename from it's extension {:?}", input_filename))?;
 
@@ -91,7 +92,7 @@ struct PartCount{
     all_parts_count:u8,
 }
 
-fn count_gopro_parts( base_file:&PathBuf, known_missing_files: &Vec<PathBuf> ) -> Result<PartCount> {
+fn count_gopro_parts( base_file:&Path, known_missing_files: &[PathBuf] ) -> Result<PartCount> {
 
     let mut parts:PartCount = PartCount{existing_parts_count:0, all_parts_count:0};
 
@@ -109,7 +110,7 @@ fn count_gopro_parts( base_file:&PathBuf, known_missing_files: &Vec<PathBuf> ) -
         }
     }
 
-    return Ok(parts);
+    Ok(parts)
 }
 
 fn filetype(ext: &str) -> Result<JsonFileInfoTypes> {
@@ -128,24 +129,26 @@ fn filetype(ext: &str) -> Result<JsonFileInfoTypes> {
 impl SourceMediaInterface for GoProInterface {
     //TODO: handle case where the thumbnail is in the known missing files and the item needs to be
     //represented by something else
-    fn list_thumbnail( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>> {
-        filter_dir(source_media_card.as_path(), |filename: &str, input_ext: Option<&str>, path: &PathBuf, path_str: &str| {
+    fn list_thumbnail( &self, _source_media_location: &Path, source_media_card: &Path, known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>> {
+        filter_dir(source_media_card, |filename: &str, input_ext: Option<&str>, path: &PathBuf, path_str: &str| {
             let ext = input_ext.ok_or_else(|| anyhow!("Expected filter_dir to porivde a file extension"))?;
             match ext {
                 "THM" => {
                     let part_id = get_gopro_video_part_id(filename.to_string())?;
                     if part_id != 1 {
                         for n in 1..part_id{
-                            let n_file = create_gopro_video_file(&path, n, GoProVideoFileType::HighBitrateVideo)?;
+                            let n_file = create_gopro_video_file(path, n, GoProVideoFileType::HighBitrateVideo)?;
                             if ! known_missing_files.contains(&n_file){
                                 return Ok(None);
                             }
                         }
                     }
 
-                    let part_count = count_gopro_parts(&path, &known_missing_files)?;
+                    let part_count = count_gopro_parts(path, &known_missing_files)?;
 
-                    return Ok(Some(create_part_file(path_str.to_string(), filetype(ext)?, part_count.existing_parts_count, 1, Some(path.with_extension("MP4").to_string_lossy().into_owned()))));
+                    let ret = create_part_file(path_str.to_string(), filetype(ext)?, part_count.existing_parts_count, 1, Some(path.with_extension("MP4").to_string_lossy().into_owned()));
+
+                    Ok(Some(ret))
                 }
                 "JPG" => Ok(Some(create_simple_file(path_str.to_string(), filetype(ext)?)?)),
                 "MP4" | "GPR" | "LRV" | "WAV" => Ok(None),
@@ -153,37 +156,39 @@ impl SourceMediaInterface for GoProInterface {
             }
         })
     }
-    fn list_high_quality( &self, _source_media_location: &PathBuf, source_media_card: &PathBuf, known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>> {
-        filter_dir(source_media_card.as_path(),|filename: &str, input_ext: Option<&str>, path: &PathBuf, path_str: &str|{
+    fn list_high_quality( &self, _source_media_location: &Path, source_media_card: &Path, known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>> {
+        filter_dir(source_media_card,|filename: &str, input_ext: Option<&str>, path: &PathBuf, path_str: &str|{
             let ext = input_ext.ok_or_else(|| anyhow!("Expected filter_dir to porivde a file extension"))?;
             match ext {
                 "MP4" => {
                     let part_id = get_gopro_video_part_id(filename.to_string())?;
                     if part_id != 1 {
                         for n in 1..part_id{
-                            let n_file = create_gopro_video_file(&path, n, GoProVideoFileType::HighBitrateVideo)?;
+                            let n_file = create_gopro_video_file(path, n, GoProVideoFileType::HighBitrateVideo)?;
                             if ! known_missing_files.contains(&n_file){
                                 return Ok(None);
                             }
                         }
                     }
 
-                    let part_count = count_gopro_parts(&path, &known_missing_files)?;
+                    let part_count = count_gopro_parts(path, &known_missing_files)?;
 
-                    return Ok(Some(create_part_file(path_str.to_string(), filetype(ext)?, part_count.existing_parts_count, 1, Some(path_str.to_string()))));
+                    let ret = create_part_file(path_str.to_string(), filetype(ext)?, part_count.existing_parts_count, 1, Some(path_str.to_string()));
+
+                    Ok(Some(ret))
                 }
                 "GPR" | "JPG" => {
                     if ext == "GPR" || !create_gopro_photo_file(path, GoProPhotoFileType::RawPhoto)?.exists() {
-                        return Ok(Some(create_simple_file(path_str.to_string(), filetype(ext)?)?))
+                        return Ok(Some(create_simple_file(path_str.to_string(), filetype(ext)?)?));
                     }
-                    return Ok(None);
+                    Ok(None)
                 }
                 "THM" | "LRV" | "WAV" => Ok(None),
                 _ => Err(anyhow!("Unexpected file {}", path_str)),
             }
         })
     }
-    fn get_related(&self, _source_media_location: &PathBuf, source_media_file: &PathBuf, known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>>{
+    fn get_related(&self, _source_media_location: &Path, source_media_file: &Path, known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>>{
         let mut items = Vec::<FileItem>::new();
 
         let ext = get_extension_str(source_media_file)?;
@@ -206,6 +211,8 @@ impl SourceMediaInterface for GoProInterface {
                     for (file_type_enum, optional) in video_types {
                         let file = create_gopro_video_file(source_media_file, part, file_type_enum)?;
                         let extension = get_extension_str(&file)?;
+
+                        #[allow(clippy::collapsible_else_if)]
                         if optional {
                             if let Some(item) = create_part_file_if_exists(&file, filetype(extension)?, part_count.existing_parts_count, existing_part_number, None) {
                                 items.push(item);
@@ -236,10 +243,10 @@ impl SourceMediaInterface for GoProInterface {
                 return Err(anyhow!("Invalid input file"));
             }
         };
-        return Ok(items);
+        Ok(items)
     }
 
     fn name(&self) -> String {
-        return "GoPro-Hero-Generic-1".to_string()
+        "GoPro-Hero-Generic-1".to_string()
     }
 }

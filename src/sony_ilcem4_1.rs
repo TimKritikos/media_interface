@@ -1,18 +1,18 @@
 use anyhow::{Result, anyhow, Context};
 use crate::SourceMediaInterface;
-use std::path::{PathBuf};
+use std::path::{PathBuf,Path};
 use crate::FileItem;
 use crate::helpers::*;
 use crate::helpers::ItemType::*;
 use crate::helpers::FileType::*;
 use std::fs;
 
-fn filetype(file: &PathBuf, source_media_location: &PathBuf) -> Result<crate::helpers::JsonFileInfoTypes> {
-    let extension = get_extension_str(&file)?;
+fn filetype(file: &Path, source_media_location: &Path) -> Result<crate::helpers::JsonFileInfoTypes> {
+    let extension = get_extension_str(file)?;
     let file_str = file.to_string_lossy();
     let parent_folder = file.parent().context("File has no parent directory")?;
     let grandparent_folder = parent_folder.parent().context("File has no grandparent directory")?;
-    let grandparent_name = osstr_to_str(&grandparent_folder.file_name().ok_or_else(|| anyhow!("Failed to get name of grandparent folder"))?)?;
+    let grandparent_name = osstr_to_str(grandparent_folder.file_name().ok_or_else(|| anyhow!("Failed to get name of grandparent folder"))?)?;
 
     if grandparent_name == "DCIM"{
         let parent_folder_name = osstr_to_str(parent_folder.file_name()
@@ -33,12 +33,12 @@ fn filetype(file: &PathBuf, source_media_location: &PathBuf) -> Result<crate::he
 
     if grandparent_name == "M4ROOT" {
         let private_folder = grandparent_folder.parent().context("Traversing path backwards, expected to reach PRIVATE folder but failed")?;
-        let private_folder_name = osstr_to_str(&private_folder.file_name().ok_or_else(|| anyhow!("failed to get filename of what's expected to be the PRIVATE folder"))?)?;
+        let private_folder_name = osstr_to_str(private_folder.file_name().ok_or_else(|| anyhow!("failed to get filename of what's expected to be the PRIVATE folder"))?)?;
         let expected_source_media_location = private_folder.parent().context("Traversing path backwards, expected to reach card dir but failed")?
                                                            .parent().context("Traversing path backwards, expected to reach source media dir but failed")?;
 
         if private_folder_name == "PRIVATE" && expected_source_media_location == source_media_location {
-            let m4root_subfolder_name = osstr_to_str(&parent_folder.file_name().ok_or_else(|| anyhow!("failed to get filename of what's expected to be the M4ROOT folder"))?)?;
+            let m4root_subfolder_name = osstr_to_str(parent_folder.file_name().ok_or_else(|| anyhow!("failed to get filename of what's expected to be the M4ROOT folder"))?)?;
             return match m4root_subfolder_name {
                 "CLIP" => {
                     match extension {
@@ -58,7 +58,7 @@ fn filetype(file: &PathBuf, source_media_location: &PathBuf) -> Result<crate::he
         }
     }
 
-    return Err(anyhow::anyhow!("File path not in expected directory structure '{}'", file_str))
+    Err(anyhow::anyhow!("File path not in expected directory structure '{}'", file_str))
 }
 
 enum VideoFiles{
@@ -67,8 +67,8 @@ enum VideoFiles{
     Metadata,
 }
 
-fn get_video_id( file:&PathBuf, file_type:VideoFiles ) -> Result<String> {
-    let input_filename = file.as_path().file_name().ok_or_else(|| anyhow!("Couldn't get filename of video file"))?.to_string_lossy();
+fn get_video_id( file:&Path, file_type:VideoFiles ) -> Result<String> {
+    let input_filename = file.file_name().ok_or_else(|| anyhow!("Couldn't get filename of video file"))?.to_string_lossy();
 
     Ok( match file_type {
         VideoFiles::Thumbnail => input_filename[1..=4].to_string(),
@@ -77,7 +77,7 @@ fn get_video_id( file:&PathBuf, file_type:VideoFiles ) -> Result<String> {
     } )
 }
 
-fn create_video_file( input_file:&PathBuf, id:&String, file_type:VideoFiles ) -> Result<PathBuf> {
+fn create_video_file( input_file:&Path, id:&String, file_type:VideoFiles ) -> Result<PathBuf> {
     let m4root = input_file.parent().context("Traversing path backwards, expected to reach m4root subfolder but failed")?
                            .parent().context("Traversing path backwards, expected to reach m4root dir but failed")?;
     Ok ( match file_type{
@@ -92,7 +92,7 @@ pub struct SonyInterface;
 impl SourceMediaInterface for SonyInterface {
     //TODO: handle case where the thumbnail is in the known missing files and the item needs to be represented by something else
 
-    fn list_thumbnail(&self,  source_media_location: &PathBuf,  source_media_card: &PathBuf, _known_missing_files: Vec<PathBuf> ) -> Result<Vec<FileItem>> {
+    fn list_thumbnail(&self,  source_media_location: &Path,  source_media_card: &Path, _known_missing_files: Vec<PathBuf> ) -> Result<Vec<FileItem>> {
         let mut files = Vec::<FileItem>::new();
         let dcim = source_media_card.join("DCIM/");
         if dcim.exists(){
@@ -124,9 +124,10 @@ impl SourceMediaInterface for SonyInterface {
             }
         })?;
         files.append(&mut videos);
-        return Ok(files);
+
+        Ok(files)
     }
-    fn list_high_quality(&self,  source_media_location: &PathBuf, source_media_card: &PathBuf, _known_missing_files: Vec<PathBuf> ) -> Result<Vec<FileItem>> {
+    fn list_high_quality(&self,  source_media_location: &Path, source_media_card: &Path, _known_missing_files: Vec<PathBuf> ) -> Result<Vec<FileItem>> {
         let mut files = Vec::<FileItem>::new();
         let dcim = source_media_card.join("DCIM/");
         if dcim.exists(){
@@ -159,9 +160,10 @@ impl SourceMediaInterface for SonyInterface {
             }
         })?;
         files.append(&mut videos);
-        return Ok(files);
+
+        Ok(files)
     }
-    fn get_related(&self, source_media_location: &PathBuf, source_media_file: &PathBuf, known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>>{
+    fn get_related(&self, source_media_location: &Path, source_media_file: &Path, known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>>{
         let mut items = Vec::<FileItem>::new();
 
         let input_file_types = filetype(source_media_file, source_media_location)?;
@@ -175,7 +177,8 @@ impl SourceMediaInterface for SonyInterface {
                         items.push(v);
                     }
                 }
-                return Ok(items);
+
+                Ok(items)
             }
             ItemVideo => {
                 let video_type = match input_file_types.file_type{
@@ -193,7 +196,8 @@ impl SourceMediaInterface for SonyInterface {
                         items.push(item);
                     }
                 }
-                return Ok(items);
+
+                Ok(items)
             }
             _ => {
                 Err(anyhow::anyhow!("Internal error"))
@@ -201,6 +205,6 @@ impl SourceMediaInterface for SonyInterface {
         }
     }
     fn name(&self) -> String {
-        return "Sony-ILCEM4-1".to_string()
+        "Sony-ILCEM4-1".to_string()
     }
 }

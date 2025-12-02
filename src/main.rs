@@ -1,7 +1,7 @@
 use anyhow::{Result};
 use clap::{Parser, ArgGroup};
 use serde::{Deserialize, Serialize};
-use std::path::{PathBuf};
+use std::path::{PathBuf,Path};
 use std::process;
 use std::fs;
 
@@ -69,9 +69,9 @@ struct SourceMediaEntry {
 // Handler data //
 //////////////////
 trait SourceMediaInterface {
-    fn list_thumbnail(&self, source_media_location: &PathBuf, source_media_card: &PathBuf, known_missing_file: Vec<PathBuf>) -> Result<Vec<FileItem>>;
-    fn list_high_quality(&self, source_media_location: &PathBuf, source_media_card: &PathBuf, known_missing_file: Vec<PathBuf>) -> Result<Vec<FileItem>>;
-    fn get_related(&self, source_media_location: &PathBuf, source_media_file: &PathBuf, known_missing_file: Vec<PathBuf>) -> Result<Vec<FileItem>>;
+    fn list_thumbnail(&self, source_media_location: &Path, source_media_card: &Path, known_missing_file: Vec<PathBuf>) -> Result<Vec<FileItem>>;
+    fn list_high_quality(&self, source_media_location: &Path, source_media_card: &Path, known_missing_file: Vec<PathBuf>) -> Result<Vec<FileItem>>;
+    fn get_related(&self, source_media_location: &Path, source_media_file: &Path, known_missing_file: Vec<PathBuf>) -> Result<Vec<FileItem>>;
     fn name(&self) -> String;
 }
 
@@ -183,21 +183,13 @@ fn main() -> Result<()> {
     }
 
     let mut known_missing_files: Vec<PathBuf> = Vec::new();
-    match cfg.errata {
-        Some(errata) => {
-            match errata.known_missing_files{
-                Some(known_missing_files_input) => {
-                    for file_input in known_missing_files_input{
-                        let path: PathBuf = config_file_path.parent().unwrap().to_path_buf();
-                        let absolute_path: PathBuf = fs::canonicalize(&path)
-                            .unwrap_or_else(|e| fail_main(&mut output, format!("Error reading errata missing file {:?}: {}", &path, e))).join(&file_input);
-                        known_missing_files.push(absolute_path);
-                    }
-                }
-                None =>{}
-            }
+    if let Some(errata) = cfg.errata && let Some(known_missing_files_input) = errata.known_missing_files {
+        for file_input in known_missing_files_input{
+            let path: PathBuf = config_file_path.parent().unwrap().to_path_buf();
+            let absolute_path: PathBuf = fs::canonicalize(&path)
+                .unwrap_or_else(|e| fail_main(&mut output, format!("Error reading errata missing file {:?}: {}", &path, e))).join(&file_input);
+            known_missing_files.push(absolute_path);
         }
-        None => {}
     }
 
     // execute the appropriate code of the appropriate handler
@@ -226,28 +218,26 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn handle_action_with_input<F>( mut output: &mut OutputJson, input_file: &PathBuf, handlers: Vec<HandlerMapEntry>, known_missing_files: Vec<PathBuf>, arg_is_card: bool, action: F, ) where
+fn handle_action_with_input<F>(output: &mut OutputJson, input_file: &Path, handlers: Vec<HandlerMapEntry>, known_missing_files: Vec<PathBuf>, arg_is_card: bool, action: F, ) where
     F: Fn(&dyn SourceMediaInterface, &PathBuf, &PathBuf, Vec<PathBuf>) -> Result<Vec<FileItem>>,
 {
-    let input_path = input_file.as_path();
-
-    let file = fs::canonicalize(input_path)
-        .unwrap_or_else(|e| fail_main(&mut output, format!("error finding the absolute path of input file: {}", e)));
+    let file = fs::canonicalize(input_file)
+        .unwrap_or_else(|e| fail_main(output, format!("error finding the absolute path of input file: {}", e)));
 
     let handler_entry = handlers.iter()
         .find(|entry| file.starts_with(&entry.location))
-        .unwrap_or_else(|| fail_main(&mut output, "Couldn't find handler responsible for a dir in the path of the input file".into()));
+        .unwrap_or_else(|| fail_main(output, "Couldn't find handler responsible for a dir in the path of the input file".to_string()));
 
     let handler = get_handler(&handler_entry.name)
-        .unwrap_or_else(|e| fail_main(&mut output, format!("couldn't load handler {}: {}", handler_entry.name, e)));
+        .unwrap_or_else(|e| fail_main(output, format!("couldn't load handler {}: {}", handler_entry.name, e)));
 
-    if arg_is_card == true && file.parent().unwrap() != handler_entry.location {
-        fail_main(&mut output, format!("List path entered is not a card directory"));
+    if arg_is_card && file.parent().unwrap() != handler_entry.location {
+        fail_main(output, "List path entered is not a card directory".to_string());
     }
 
     output.file_list = Some(
         action(handler.as_ref(), &handler_entry.location, &file, known_missing_files)
-            .unwrap_or_else(|e| fail_main(&mut output, format!("handler {}: {}", handler.name(), e)))
+            .unwrap_or_else(|e| fail_main(output, format!("handler {}: {}", handler.name(), e)))
     );
 
     output.command_success = true;

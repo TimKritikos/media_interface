@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow};
 use crate::SourceMediaInterface;
-use std::path::{PathBuf};
+use std::path::{PathBuf,Path};
 use crate::helpers::*;
 use crate::FileItem;
 use crate::helpers::ItemType::*;
@@ -20,8 +20,8 @@ fn filetype(ext: &str) -> Result<JsonFileInfoTypes> {
 }
 
 impl SourceMediaInterface for GenericSingleFileItem {
-    fn list_thumbnail(&self, _source_media_location: &PathBuf,  source_media_card: &PathBuf, _known_missing_files: Vec<PathBuf> ) -> Result<Vec<FileItem>> {
-        filter_dir(source_media_card.as_path(),|_filename: &str, input_ext: Option<&str>, _path: &PathBuf, path_str: &str|{
+    fn list_thumbnail(&self, _source_media_location: &Path,  source_media_card: &Path, _known_missing_files: Vec<PathBuf> ) -> Result<Vec<FileItem>> {
+        filter_dir(source_media_card,|_filename: &str, input_ext: Option<&str>, _path: &PathBuf, path_str: &str|{
             let ext = input_ext.ok_or_else(|| anyhow!("Expected filter_dir to provide a file extension"))?;
             let types = filetype(ext)?;
             match types.file_type{
@@ -31,10 +31,10 @@ impl SourceMediaInterface for GenericSingleFileItem {
             }
         })
     }
-    fn list_high_quality(&self,  source_media_location: &PathBuf,  source_media_card: &PathBuf, known_missing_files: Vec<PathBuf> ) -> Result<Vec<FileItem>> {
+    fn list_high_quality(&self,  source_media_location: &Path,  source_media_card: &Path, known_missing_files: Vec<PathBuf> ) -> Result<Vec<FileItem>> {
         self.list_thumbnail(source_media_location, source_media_card, known_missing_files)
     }
-    fn get_related(&self, _source_media_location: &PathBuf, source_media_file: &PathBuf, _known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>>{
+    fn get_related(&self, _source_media_location: &Path, source_media_file: &Path, _known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>>{
         let extension = get_extension_str(source_media_file)?;
         let types = filetype(extension)?;
         match types.file_type{
@@ -44,6 +44,6 @@ impl SourceMediaInterface for GenericSingleFileItem {
         }
     }
     fn name(&self) -> String {
-        return "Generic-Single-File-Items".to_string()
+        "Generic-Single-File-Items".to_string()
     }
 }
