@@ -1,3 +1,24 @@
+/* gnss_tracker_generic.rs - Generic handler for devices that create GNSS tracks and store the
+ * items either with a single file or with the same filename and different extensions like with the
+ * BasicAirData's "GPS Logger" Android app
+
+   This file is part of the media-interface project
+
+   Copyright (c) 2025 Efthymios Kritikos
+
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+
 use anyhow::{Result, anyhow};
 use crate::SourceMediaInterface;
 use std::path::{PathBuf,Path};
