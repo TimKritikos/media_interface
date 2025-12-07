@@ -11,3 +11,4 @@ walkdir = "2.3"
 regex = "1.10"
 clap = { version = "4.3", features = ["derive"] }
 env = "1.0.1"
+bitflags = "2.10.0"

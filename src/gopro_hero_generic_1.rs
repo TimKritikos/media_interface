@@ -19,6 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 use anyhow::{Result, anyhow, Context};
+use bitflags::bitflags;
 use crate::SourceMediaInterface;
 use std::path::{PathBuf,Path};
 use crate::helpers::*;
@@ -37,11 +38,16 @@ fn get_gopro_video_part_id(filename:String) -> Result<u8> {
     };
 }
 
-enum GoProVideoFileType{
-    LowBitrateVideo,
-    HighBitrateVideo,
-    WavAudio,
-    ThumbnailPhoto,
+bitflags!{
+    #[derive(PartialEq)]
+    struct GoProVideoFileType: u8 {
+        const LowBitrateVideo             = 1 << 0;
+        const HighBitrateH265Video        = 1 << 1;
+        const HighBitrateH264Video        = 1 << 2;
+        const WavAudio                    = 1 << 3;
+        const ThumbnailPhoto_of_H264Video = 1 << 4;
+        const ThumbnailPhoto_of_H265Video = 1 << 5;
+    }
 }
 
 enum GoProPhotoFileType{
@@ -68,7 +74,7 @@ fn create_gopro_photo_file(input_file:&Path, file_type: GoProPhotoFileType ) -> 
     Ok(input_dirname.join(format!("{name}.{new_extension}")))
 }
 
-fn create_gopro_video_file(input_file:&Path, part:u8, file_type: GoProVideoFileType ) -> Result<PathBuf> {
+fn create_gopro_video_file(input_file:&Path, part:u8, file_type: &GoProVideoFileType ) -> Result<PathBuf> {
 
     let input_filename = input_file.file_name().ok_or_else(|| anyhow!("Couldn't get filename of reference photo file"))?.to_string_lossy();
 
@@ -80,21 +86,27 @@ fn create_gopro_video_file(input_file:&Path, part:u8, file_type: GoProVideoFileT
 
     let media_id = &name[4..];
 
-    let new_prefix = match file_type {
-        GoProVideoFileType::LowBitrateVideo => "GL",
-        GoProVideoFileType::HighBitrateVideo => "GX",
-        GoProVideoFileType::WavAudio => "GX",
-        GoProVideoFileType::ThumbnailPhoto => "GX",
-    };
+    let new_prefix = match *file_type {
+        GoProVideoFileType::LowBitrateVideo => Ok("GL"),
+        GoProVideoFileType::HighBitrateH264Video => Ok("GH"),
+        GoProVideoFileType::HighBitrateH265Video => Ok("GX"),
+        GoProVideoFileType::WavAudio => Ok("GX"),
+        GoProVideoFileType::ThumbnailPhoto_of_H264Video => Ok("GH"),
+        GoProVideoFileType::ThumbnailPhoto_of_H265Video => Ok("GX"),
+        _ => Err(anyhow!("expected one and only one type")),
+    }?;
 
     let new_part = format!("{:02}", part);
 
-    let new_extension = match file_type {
-        GoProVideoFileType::LowBitrateVideo => "LRV",
-        GoProVideoFileType::HighBitrateVideo => "MP4",
-        GoProVideoFileType::WavAudio => "WAV",
-        GoProVideoFileType::ThumbnailPhoto => "THM",
-    };
+    let new_extension = match *file_type {
+        GoProVideoFileType::LowBitrateVideo => Ok("LRV"),
+        GoProVideoFileType::HighBitrateH264Video => Ok("MP4"),
+        GoProVideoFileType::HighBitrateH265Video => Ok("MP4"),
+        GoProVideoFileType::WavAudio => Ok("WAV"),
+        GoProVideoFileType::ThumbnailPhoto_of_H264Video => Ok("THM"),
+        GoProVideoFileType::ThumbnailPhoto_of_H265Video => Ok("THM"),
+        _ => Err(anyhow!("expected one and only one type")),
+    }?;
 
     let input_dirname = input_file.parent().context("Couldn't get file's parent directory")?;
 
@@ -117,11 +129,14 @@ fn count_gopro_parts( base_file:&Path, known_missing_files: &[PathBuf] ) -> Resu
     let mut parts:PartCount = PartCount{existing_parts_count:0, all_parts_count:0};
 
     for part in 1..=99 {
-        let file = create_gopro_video_file(base_file, part, GoProVideoFileType::HighBitrateVideo)?;
-        if file.exists() {
+
+        let file_h265 = create_gopro_video_file(base_file, part, &GoProVideoFileType::HighBitrateH265Video)?;
+        let file_h264 = create_gopro_video_file(base_file, part, &GoProVideoFileType::HighBitrateH264Video)?;
+
+        if file_h264.exists() || file_h265.exists() {
             parts.existing_parts_count+=1;
             parts.all_parts_count+=1;
-        }else if known_missing_files.contains(&file) {
+        }else if known_missing_files.contains(&file_h264) || known_missing_files.contains(&file_h265) {
             parts.all_parts_count+=1;
         }else if part == 0 {
             return Err(anyhow!("Iniital video file not found"));
@@ -157,7 +172,7 @@ impl SourceMediaInterface for GoProInterface {
                     let part_id = get_gopro_video_part_id(filename.to_string())?;
                     if part_id != 1 {
                         for n in 1..part_id{
-                            let n_file = create_gopro_video_file(path, n, GoProVideoFileType::HighBitrateVideo)?;
+                            let n_file = create_gopro_video_file(path, n, &GoProVideoFileType::LowBitrateVideo)?; // TODO: It could be the case that we are missing the LRV but the MP4 is there in which case it's better to return a high quality equivelant of the first part of the video than either a later low quality or none at all
                             if ! known_missing_files.contains(&n_file){
                                 return Ok(None);
                             }
@@ -184,8 +199,9 @@ impl SourceMediaInterface for GoProInterface {
                     let part_id = get_gopro_video_part_id(filename.to_string())?;
                     if part_id != 1 {
                         for n in 1..part_id{
-                            let n_file = create_gopro_video_file(path, n, GoProVideoFileType::HighBitrateVideo)?;
-                            if ! known_missing_files.contains(&n_file){
+                            let h264_file = create_gopro_video_file(path, n, &GoProVideoFileType::HighBitrateH264Video)?;
+                            let h265_file = create_gopro_video_file(path, n, &GoProVideoFileType::HighBitrateH264Video)?;
+                            if ! known_missing_files.contains(&h265_file)|| ! known_missing_files.contains(&h264_file){ //TODO: Same warning as in list_thumbnail about missing files
                                 return Ok(None);
                             }
                         }
@@ -220,33 +236,40 @@ impl SourceMediaInterface for GoProInterface {
 
                 let mut existing_part_number:u8 = 1;
                 for part in 1..=part_count.all_parts_count {
-                    let video_types = [
-                        (GoProVideoFileType::HighBitrateVideo, false),
-                        (GoProVideoFileType::LowBitrateVideo,  false),
-                        (GoProVideoFileType::ThumbnailPhoto,   false),
-                        (GoProVideoFileType::WavAudio,         true ),
+
+                    let file_types = [
+                        GoProVideoFileType::HighBitrateH264Video,
+                        GoProVideoFileType::HighBitrateH265Video,
+                        GoProVideoFileType::LowBitrateVideo,
+                        GoProVideoFileType::ThumbnailPhoto_of_H265Video,
+                        GoProVideoFileType::ThumbnailPhoto_of_H264Video,
+                        GoProVideoFileType::WavAudio,
                     ];
 
-                    let mut existed = false;
-                    for (file_type_enum, optional) in video_types {
-                        let file = create_gopro_video_file(source_media_file, part, file_type_enum)?;
+                    let mut found_types = GoProVideoFileType::empty();
+
+                    for file_type_enum in file_types {
+                        let file = create_gopro_video_file(source_media_file, part, &file_type_enum)?;
                         let extension = get_extension_str(&file)?;
 
-                        #[allow(clippy::collapsible_else_if)]
-                        if optional {
-                            if let Some(item) = create_part_file_if_exists(&file, filetype(extension)?, part_count.existing_parts_count, existing_part_number, None) {
-                                items.push(item);
-                                existed = true;
-                            }
-                        } else {
-                            if let Some(item) = create_part_file_that_exists(&file, filetype(extension)?, part_count.existing_parts_count, existing_part_number, None, &known_missing_files)?{
-                                items.push(item);
-                                existed = true;
-                            }
+                        if let Some(item) = create_part_file_if_exists(&file, filetype(extension)?, part_count.existing_parts_count, existing_part_number, None) {
+                            items.push(item);
+                            found_types |= file_type_enum;
+                        }else if known_missing_files.contains(&file){
+                            found_types |= file_type_enum;
                         }
                     }
-                    if existed {
+                    if found_types != GoProVideoFileType::empty() {
                         existing_part_number+=1;
+                    }
+                    if ! (found_types.contains(GoProVideoFileType::HighBitrateH264Video) ^ found_types.contains(GoProVideoFileType::HighBitrateH265Video) ){
+                        return Err(anyhow!("expected either an H265 GX video or an H264 GL video. Got either both or none"));
+                    }
+                    if ! (found_types.contains(GoProVideoFileType::ThumbnailPhoto_of_H264Video) ^ found_types.contains(GoProVideoFileType::ThumbnailPhoto_of_H265Video)) {
+                        return Err(anyhow!("expected either an H265 GX video thumbnail or an H264 GL video thumbnail. Got either both or none"));
+                    }
+                    if ! found_types.contains(GoProVideoFileType::LowBitrateVideo){
+                        return Err(anyhow!("expected a low bitrate LRV video file"));
                     }
                 }
             },
