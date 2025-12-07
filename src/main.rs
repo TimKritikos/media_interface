@@ -66,9 +66,13 @@ struct Cli {
 // config file data //
 //////////////////////
 #[derive(Debug, Deserialize)]
-struct Config {
+struct MainConfig {
     data_type: String,
     source_media: Vec<SourceMediaEntry>,
+}
+#[derive(Debug, Deserialize)]
+struct PerSourceConfig {
+    data_type: String,
     errata: Option<Errata>,
 }
 
@@ -115,6 +119,7 @@ fn get_handler(id: &str) -> Result<Box<dyn SourceMediaInterface>> {
 struct HandlerMapEntry{
     name: String,
     location: PathBuf,
+    root: PathBuf,
 }
 
 ////////////////////////////////
@@ -147,7 +152,19 @@ struct FileItem {
 //////////
 // Main //
 //////////
-fn fail_main( data: &mut OutputJson, error: String ) -> ! {
+
+fn create_base_output_json() -> OutputJson {
+    OutputJson{
+        data_type: "source_media_interface_api",
+        version: env!("CARGO_PKG_VERSION"),
+        command_success: false,
+        file_list: None,
+        error_string: Some("Uninitialised error message".to_string())
+    }
+}
+
+fn fail_main( error: String ) -> ! {
+    let mut data = create_base_output_json();
     data.error_string=Some(error.clone());
     data.file_list=None;
     println!("{}", serde_json::to_string(&data).unwrap_or_else(|_| "Failed to serialise json".to_string()));
@@ -156,13 +173,6 @@ fn fail_main( data: &mut OutputJson, error: String ) -> ! {
 }
 
 fn main() -> Result<()> {
-    let mut output = OutputJson{
-        data_type: "source_media_interface_api",
-        version: env!("CARGO_PKG_VERSION"),
-        command_success: false,
-        file_list: None,
-        error_string: Some("Uninitialised error message".to_string())
-    };
 
     let cli = Cli::parse();
 
@@ -184,52 +194,43 @@ fn main() -> Result<()> {
 
     // Load config file
     let data = std::fs::read_to_string(&config_file_path)
-        .unwrap_or_else(|e| fail_main(&mut output, format!("Failed to read config file {:?}: {}", config_file_path, e)));
+        .unwrap_or_else(|e| fail_main(format!("Failed to read config file {:?}: {}", config_file_path, e)));
 
-    let cfg: Config = serde_json::from_str(&data)?;
+    let cfg: MainConfig = serde_json::from_str(&data)?;
 
     if cfg.data_type != "source_media_config" {
-        fail_main(&mut output, format!("Invalid data type on the config file: {}", cfg.data_type));
+        fail_main(format!("Invalid data type on the config file: {}", cfg.data_type));
     }
 
     // Load handler data from config data
     let mut handlers: Vec<HandlerMapEntry> = Vec::new();
     for cam in cfg.source_media {
-        let path: PathBuf = config_file_path.parent().unwrap().join(&cam.path).join(&cam.card_subdir);
+        let source_root: PathBuf = config_file_path.parent().unwrap().join(&cam.path);
+        let path: PathBuf = source_root.join(&cam.card_subdir);
         let absolute_path: PathBuf = fs::canonicalize(&path)
-            .unwrap_or_else(|e| fail_main(&mut output, format!("Error reading source media dir {:?}: {}", &path, e)));
-        handlers.push(HandlerMapEntry{location:absolute_path,name:cam.handler});
-    }
-
-    let mut known_missing_files: Vec<PathBuf> = Vec::new();
-    if let Some(errata) = cfg.errata && let Some(known_missing_files_input) = errata.known_missing_files {
-        for file_input in known_missing_files_input{
-            let path: PathBuf = config_file_path.parent().unwrap().to_path_buf();
-            let absolute_path: PathBuf = fs::canonicalize(&path)
-                .unwrap_or_else(|e| fail_main(&mut output, format!("Error reading errata missing file {:?}: {}", &path, e))).join(&file_input);
-            known_missing_files.push(absolute_path);
-        }
+            .unwrap_or_else(|e| fail_main(format!("Error reading source media dir {:?}: {}", &path, e)));
+        handlers.push(HandlerMapEntry{location:absolute_path,name:cam.handler,root:source_root});
     }
 
     // execute the appropriate code of the appropriate handler
-    if let Some(input_file) = cli.list_thumbnail.as_ref() {
+    let output = if let Some(input_file) = cli.list_thumbnail.as_ref() {
 
-        handle_action_with_input(&mut output, input_file, handlers, known_missing_files, true,
-            |handler, base, file, known_missing_files| handler.list_thumbnail(base, file, known_missing_files));
+        handle_action_with_input( input_file, handlers, true,
+            |handler, base, file, known_missing_files| handler.list_thumbnail(base, file, known_missing_files))
 
     }else if let Some(input_file) = cli.list_high_quality.as_ref() {
 
-        handle_action_with_input(&mut output, input_file, handlers, known_missing_files, true,
-            |handler, base, file, known_missing_files| handler.list_high_quality(base, file, known_missing_files));
+        handle_action_with_input( input_file, handlers, true,
+            |handler, base, file, known_missing_files| handler.list_high_quality(base, file, known_missing_files))
 
     }else if let Some(input_file) = cli.get_related.as_ref() {
 
-        handle_action_with_input(&mut output, input_file, handlers, known_missing_files, false,
-            |handler, base, file, known_missing_files| handler.get_related(base, file, known_missing_files));
+        handle_action_with_input( input_file, handlers, false,
+            |handler, base, file, known_missing_files| handler.get_related(base, file, known_missing_files))
 
     }else{
-        fail_main(&mut output, "Internal error: no action selected".into());
-    }
+        fail_main( "Internal error: no action selected".into())
+    };
 
     // Output response from handler as json
     println!("{}", serde_json::to_string(&output)?);
@@ -237,29 +238,55 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn handle_action_with_input<F>(output: &mut OutputJson, input_file: &Path, handlers: Vec<HandlerMapEntry>, known_missing_files: Vec<PathBuf>, arg_is_card: bool, action: F, ) where
+fn handle_action_with_input<F>(input_file: &Path, handlers: Vec<HandlerMapEntry>, arg_is_card: bool, action: F, ) -> OutputJson where
     F: Fn(&dyn SourceMediaInterface, &PathBuf, &PathBuf, Vec<PathBuf>) -> Result<Vec<FileItem>>,
 {
+    let mut output = create_base_output_json();
+    let mut known_missing_files: Vec<PathBuf> = Vec::new();
+
     let file = fs::canonicalize(input_file)
-        .unwrap_or_else(|e| fail_main(output, format!("error finding the absolute path of input file: {}", e)));
+        .unwrap_or_else(|e| fail_main(format!("error finding the absolute path of input file: {}", e)));
 
     let handler_entry = handlers.iter()
         .find(|entry| file.starts_with(&entry.location))
-        .unwrap_or_else(|| fail_main(output, "Couldn't find handler responsible for a dir in the path of the input file".to_string()));
+        .unwrap_or_else(|| fail_main("Couldn't find handler responsible for a dir in the path of the input file".to_string()));
 
     let handler = get_handler(&handler_entry.name)
-        .unwrap_or_else(|e| fail_main(output, format!("couldn't load handler {}: {}", handler_entry.name, e)));
+        .unwrap_or_else(|e| fail_main(format!("couldn't load handler {}: {}", handler_entry.name, e)));
+
+    let per_source_config = handler_entry.root.join(PathBuf::from("interface_config.json"));
+    if per_source_config.exists() {
+        let data = std::fs::read_to_string(&per_source_config)
+            .unwrap_or_else(|e| fail_main(format!("Failed to read per source config file {:?}: {}", per_source_config, e)));
+
+        let cfg: PerSourceConfig = serde_json::from_str(&data).unwrap_or_else(|e| fail_main(format!("Failed to parse JSON from per source config file {:?}: {}",per_source_config, e)));
+
+        if cfg.data_type != "source_media_config" {
+            fail_main(format!("Invalid data type on the config file: {}", cfg.data_type));
+        }
+
+        if let Some(errata) = &cfg.errata && let Some(known_missing_files_input) = &errata.known_missing_files {
+            for file_input in known_missing_files_input{
+                let path: PathBuf = per_source_config.parent().unwrap().to_path_buf();
+                let absolute_path: PathBuf = fs::canonicalize(&path)
+                    .unwrap_or_else(|e| fail_main(format!("Error reading errata missing file {:?}: {}", &path, e))).join(&file_input);
+                known_missing_files.push(absolute_path);
+            }
+        }
+    }
 
     if arg_is_card && file.parent().unwrap() != handler_entry.location {
-        fail_main(output, "List path entered is not a card directory".to_string());
+        fail_main("List path entered is not a card directory".to_string());
     }
 
     output.file_list = Some(
         action(handler.as_ref(), &handler_entry.location, &file, known_missing_files)
-            .unwrap_or_else(|e| fail_main(output, format!("handler {}: {}", handler.name(), e)))
+            .unwrap_or_else(|e| fail_main(format!("handler {}: {}", handler.name(), e)))
     );
 
     output.command_success = true;
     output.error_string = None;
+
+    output
 }
 
