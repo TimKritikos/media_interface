@@ -60,8 +60,7 @@ fn create_gopro_photo_file(input_file:&Path, file_type: GoProPhotoFileType ) -> 
     let input_filename = input_file.file_name().ok_or_else(|| anyhow!("Couldn't get filename of reference photo file"))?.to_string_lossy();
 
     let (name, _) = input_filename.rsplit_once('.').ok_or_else(|| anyhow!("Failed to split gopro style filename from it's extension {:?}", input_filename))?;
-    #[allow(clippy::len_zero)] // This will be removed when the value changes
-    if name.len() < 1 {
+    if name.len() < 2 {
         return Err(anyhow!("Input gopro style filename without the extension was not long enough {:?}", name));
     }
     let new_extension = match file_type {
