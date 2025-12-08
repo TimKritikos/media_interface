@@ -7,7 +7,7 @@ It is possible to query for items and get a response like this `interface -l /mn
 ```json
 {
   "data_type": "source_media_interface_api",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "command_success": true,
   "file_list": [
     {
@@ -30,7 +30,7 @@ It is possible to then query for all the files representing an item by providing
 ```json
 {
   "data_type": "source_media_interface_api",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "command_success": true,
   "file_list": [
     {
