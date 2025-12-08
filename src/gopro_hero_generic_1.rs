@@ -178,13 +178,11 @@ impl SourceMediaInterface for GoProInterface {
                         }
                     }
 
-                    let part_count = count_gopro_parts(path, &known_missing_files)?;
-
-                    let ret = create_part_file(path_str.to_string(), filetype(ext)?, part_count.existing_parts_count, 1, Some(path.with_extension("MP4").to_string_lossy().into_owned()));
+                    let ret = create_simple_file(path_str.to_string(), filetype(ext)?, Some(path.with_extension("MP4").to_string_lossy().into_owned()))?;
 
                     Ok(Some(ret))
                 }
-                "JPG" => Ok(Some(create_simple_file(path_str.to_string(), filetype(ext)?)?)),
+                "JPG" => Ok(Some(create_simple_file(path_str.to_string(), filetype(ext)?, None)?)),
                 "MP4" | "GPR" | "LRV" | "WAV" => Ok(None),
                 _ => Err(anyhow!("Unexpected file {}", path_str)),
             }
@@ -214,7 +212,7 @@ impl SourceMediaInterface for GoProInterface {
                 }
                 "GPR" | "JPG" => {
                     if ext == "GPR" || !create_gopro_photo_file(path, GoProPhotoFileType::RawPhoto)?.exists() {
-                        return Ok(Some(create_simple_file(path_str.to_string(), filetype(ext)?)?));
+                        return Ok(Some(create_simple_file(path_str.to_string(), filetype(ext)?, None)?));
                     }
                     Ok(None)
                 }
@@ -276,7 +274,7 @@ impl SourceMediaInterface for GoProInterface {
                 for file_type_enum in [GoProPhotoFileType::JpegPhoto, GoProPhotoFileType::RawPhoto] {
                     let file = create_gopro_photo_file(source_media_file, file_type_enum)?;
                     let extension = get_extension_str(&file)?;
-                    if let Some(v) = create_simple_file_if_exists(&file, filetype(extension)?)? {
+                    if let Some(v) = create_simple_file_if_exists(&file, filetype(extension)?, None)? {
                         items.push(v);
                     }
                 }

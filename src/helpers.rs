@@ -56,6 +56,7 @@ where
 }
 
 #[allow(clippy::enum_variant_names)]
+#[derive(PartialEq)]
 pub enum FileType{
    FileVideo,
    FileVideoPreview,
@@ -74,7 +75,6 @@ pub enum FileType{
 }
 
 #[allow(clippy::enum_variant_names)]
-#[derive(PartialEq)]
 pub enum ItemType{
     ItemVideo,
     ItemImage,
@@ -88,9 +88,9 @@ pub struct JsonFileInfoTypes{
     pub item_type: ItemType,
 }
 
-pub fn create_simple_file_if_exists(file_path:&Path, json_file_info: JsonFileInfoTypes) -> Result<Option<FileItem>> {
+pub fn create_simple_file_if_exists(file_path:&Path, json_file_info: JsonFileInfoTypes, metadata_file:Option<String>) -> Result<Option<FileItem>> {
     if file_path.exists(){
-        Ok(Some(create_simple_file(file_path.to_string_lossy().into_owned(), json_file_info)?))
+        Ok(Some(create_simple_file(file_path.to_string_lossy().into_owned(), json_file_info, metadata_file)?))
     }else{
         Ok(None)
     }
@@ -126,15 +126,17 @@ pub fn create_part_file_that_exists(file_path:&PathBuf, json_file_info: JsonFile
     }
 }
 
-pub fn create_simple_file(file_path:String, json_file_info: JsonFileInfoTypes) -> Result<FileItem> {
-    if json_file_info.item_type == ItemType::ItemVideo { // TODO: Make this a compile time check
+pub fn create_simple_file(file_path:String, json_file_info: JsonFileInfoTypes, metadata_file:Option<String>) -> Result<FileItem> {
+    if  json_file_info.file_type == FileType::FileVideo ||
+        json_file_info.file_type == FileType::FileVideoPreview ||
+        json_file_info.file_type == FileType::FileVideoRaw { // TODO: Make this a compile time check
         return Err(anyhow::anyhow!("Internal error: Tried to generate simple file for video item"));
     }
-    Ok(create_simple_file_unchecked(file_path, json_file_info))
+    Ok(create_simple_file_unchecked(file_path, json_file_info, metadata_file))
 }
 
 #[allow(clippy::redundant_field_names)]
-fn create_simple_file_unchecked(file_path:String, json_file_info: JsonFileInfoTypes) -> FileItem {
+fn create_simple_file_unchecked(file_path:String, json_file_info: JsonFileInfoTypes, metadata_file:Option<String>) -> FileItem {
     FileItem{
         file_path:file_path,
         file_type:match json_file_info.file_type{
@@ -156,16 +158,15 @@ fn create_simple_file_unchecked(file_path:String, json_file_info: JsonFileInfoTy
         }.to_string(),
         part_count :    None,
         part_num :      None,
-        metadata_file : None,
+        metadata_file : metadata_file,
     }
 }
 
 
 pub fn create_part_file(file_path:String, json_file_info: JsonFileInfoTypes, part_count:u8, part_num:u8, metadata_file:Option<String>) -> FileItem {
-    let mut ret = create_simple_file_unchecked(file_path, json_file_info);
+    let mut ret = create_simple_file_unchecked(file_path, json_file_info, metadata_file);
     ret.part_count = Some(part_count);
     ret.part_num = Some(part_num);
-    ret.metadata_file = metadata_file;
     ret
 }
 

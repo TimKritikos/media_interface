@@ -120,13 +120,13 @@ impl SourceMediaInterface for SonyInterface {
                     match ext {
                         Some("ARW") => {
                             if ! path.with_extension("JPG").exists(){
-                                Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?)?))
+                                Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?, None)?))
                             }else{
                                 Ok(None)
                             }
                         }
                         Some("JPG") => {
-                            Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?)?))
+                            Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?, None)?))
                         }
                         Some(_) | None => Err(anyhow!("Unexpected file {}", path_str)),
                     }
@@ -155,13 +155,13 @@ impl SourceMediaInterface for SonyInterface {
                     match ext {
                         Some("JPG") => {
                             if ! path.with_extension("ARW").exists(){
-                                Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?)?))
+                                Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?, None)?))
                             }else{
                                 Ok(None)
                             }
                         }
                         Some("ARW") => {
-                            Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?)?))
+                            Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?, None)?))
                         }
                         Some(_) | None => Err(anyhow!("Unexpected file {}", path_str)),
                     }
@@ -192,7 +192,7 @@ impl SourceMediaInterface for SonyInterface {
                 let arw_path = source_media_file.with_extension("ARW");
                 let jpg_path = source_media_file.with_extension("JPG");
                 for i in [arw_path, jpg_path] {
-                    if let Some(v) = create_simple_file_if_exists(&i, filetype(&i, source_media_location)?)? {
+                    if let Some(v) = create_simple_file_if_exists(&i, filetype(&i, source_media_location)?, None)? {
                         items.push(v);
                     }
                 }

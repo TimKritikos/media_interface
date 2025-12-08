@@ -45,7 +45,7 @@ impl SourceMediaInterface for GenericSingleFileItem {
             let types = filetype(ext)?;
             match types.file_type{
                 FileVideo | FileAudio => Ok(Some(create_part_file(path_str.to_string(), types, 1, 1, None))),
-                FileImage => Ok(Some(create_simple_file(path_str.to_string(), types)?)),
+                FileImage => Ok(Some(create_simple_file(path_str.to_string(), types, None)?)),
                 _ => Err(anyhow!("Unrecognised extension '{}' in file '{}'", ext, path_str)),
             }
         })
@@ -58,7 +58,7 @@ impl SourceMediaInterface for GenericSingleFileItem {
         let types = filetype(extension)?;
         match types.file_type{
             FileVideo => Ok(vec![create_part_file(source_media_file.to_string_lossy().into_owned(), types, 1, 1, None)]),
-            FileImage => Ok(vec![create_simple_file(source_media_file.to_string_lossy().into_owned(), types)?]),
+            FileImage => Ok(vec![create_simple_file(source_media_file.to_string_lossy().into_owned(), types, None)?]),
             _ => Err(anyhow!("unexpected file type")),
         }
     }

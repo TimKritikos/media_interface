@@ -40,18 +40,18 @@ impl SourceMediaInterface for GNSSTrackerGeneric {
             let ext = input_ext.ok_or_else(|| anyhow!("Expected filter_dir to provide a file extension"))?;
             match ext.to_lowercase().as_str() {
                 "gpx" => {
-                    Ok(Some(create_simple_file(path_str.to_string(), FILE_TYPES)?))
+                    Ok(Some(create_simple_file(path_str.to_string(), FILE_TYPES, None)?))
                 }
                 "kml" => {
                     if ! path.with_extension("gpx").exists() {
-                        Ok(Some(create_simple_file(path_str.to_string(), FILE_TYPES)?))
+                        Ok(Some(create_simple_file(path_str.to_string(), FILE_TYPES, None)?))
                     }else{
                         Ok(None)
                     }
                 }
                 "txt" => {
                     if ! path.with_extension("gpx").exists() && ! path.with_extension("kml").exists() {
-                        Ok(Some(create_simple_file(path_str.to_string(), FILE_TYPES)?))
+                        Ok(Some(create_simple_file(path_str.to_string(), FILE_TYPES, None)?))
                     }else{
                         Ok(None)
                     }
@@ -67,7 +67,7 @@ impl SourceMediaInterface for GNSSTrackerGeneric {
         let mut items = Vec::<FileItem>::new();
 
         for extension in ["gpx", "kml", "txt"]{
-            if let Ok(Some(item)) = create_simple_file_if_exists(&source_media_file.with_extension(extension), FILE_TYPES) {
+            if let Ok(Some(item)) = create_simple_file_if_exists(&source_media_file.with_extension(extension), FILE_TYPES, None) {
                 items.push(item);
             }
         }
