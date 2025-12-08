@@ -98,21 +98,10 @@ To configure this program you need to specify which media handler is on what dir
 }
 ```
 
-It is also possible to specify known missing files in the configuration like so
+It is also possible to specify known missing files in per-source-media config files, for example
 ```json
 {
 	"data_type": "source_media_config",
-	"source_media": [
-		{
-			"path": "/mnt/MEDIA/source_media/GoPro_Hero_13_Black_SN:12345678/",
-			"card_subdir":"DATA",
-			"handler": "GoPro-Hero-Generic-1"
-		},{
-			"path": "/mnt/MEDIA/source_media/Sony_ILCEM4_SN:12345678/",
-			"card_subdir":"DATA",
-			"handler": "Sony-ILCEM4-1"
-		}
-	],
     "errata": {
 		"known_missing_files": [
 			"/mnt/MEDIA/source_media/GoPro_Hero_13_Black_SN:12345678/DATA/CARD0061/GL011273.LRV",
