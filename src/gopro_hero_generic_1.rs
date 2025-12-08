@@ -288,7 +288,7 @@ impl SourceMediaInterface for GoProInterface {
         Ok(items)
     }
 
-    fn name(&self) -> String {
-        "GoPro-Hero-Generic-1".to_string()
+    fn name(&self) -> &'static str {
+        "GoPro-Hero-Generic-1"
     }
 }

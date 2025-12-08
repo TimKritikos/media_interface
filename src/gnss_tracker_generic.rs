@@ -74,7 +74,7 @@ impl SourceMediaInterface for GNSSTrackerGeneric {
 
         Ok(items)
     }
-    fn name(&self) -> String {
-        "GNSS-Tracker-Generic".to_string()
+    fn name(&self) -> &'static str {
+        "GNSS-Tracker-Generic"
     }
 }

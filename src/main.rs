@@ -95,7 +95,7 @@ trait SourceMediaInterface {
     fn list_thumbnail(&self, source_media_location: &Path, source_media_card: &Path, known_missing_file: Vec<PathBuf>) -> Result<Vec<FileItem>>;
     fn list_high_quality(&self, source_media_location: &Path, source_media_card: &Path, known_missing_file: Vec<PathBuf>) -> Result<Vec<FileItem>>;
     fn get_related(&self, source_media_location: &Path, source_media_file: &Path, known_missing_file: Vec<PathBuf>) -> Result<Vec<FileItem>>;
-    fn name(&self) -> String;
+    fn name(&self) -> &'static str;
 }
 
 fn get_handler(id: &str) -> Result<Box<dyn SourceMediaInterface>> {

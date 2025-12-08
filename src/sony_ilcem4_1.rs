@@ -223,7 +223,7 @@ impl SourceMediaInterface for SonyInterface {
             }
         }
     }
-    fn name(&self) -> String {
-        "Sony-ILCEM4-1".to_string()
+    fn name(&self) -> &'static str {
+        "Sony-ILCEM4-1"
     }
 }

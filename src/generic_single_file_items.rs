@@ -62,7 +62,7 @@ impl SourceMediaInterface for GenericSingleFileItem {
             _ => Err(anyhow!("unexpected file type")),
         }
     }
-    fn name(&self) -> String {
-        "Generic-Single-File-Items".to_string()
+    fn name(&self) -> &'static str {
+        "Generic-Single-File-Items"
     }
 }
