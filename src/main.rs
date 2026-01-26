@@ -65,23 +65,23 @@ struct Cli {
 //////////////////////
 // config file data //
 //////////////////////
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 struct MainConfig {
     data_type: String,
     source_media: Vec<SourceMediaEntry>,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 struct PerSourceConfig {
     data_type: String,
     errata: Option<Errata>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 struct Errata {
     known_missing_files: Option<Vec<PathBuf>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 struct SourceMediaEntry {
     handler: String,
     card_subdir: PathBuf,
@@ -125,7 +125,7 @@ struct HandlerMapEntry{
 ////////////////////////////////
 // Output JSON structure data //
 ////////////////////////////////
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 struct OutputJson {
     data_type: &'static str,
     version: &'static str,
@@ -136,7 +136,7 @@ struct OutputJson {
     error_string: Option<String>
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 struct FileItem {
     file_path: String,
     file_type: String,
