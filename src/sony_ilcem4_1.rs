@@ -26,6 +26,21 @@ use crate::helpers::ItemType::*;
 use crate::helpers::FileType::*;
 use std::fs;
 
+fn find_m4root(card: &Path) -> Result<Option<PathBuf>> {
+    let private_m4root = card.join("PRIVATE/M4ROOT");
+    let root_m4root = card.join("M4ROOT");
+
+    match (private_m4root.exists(), root_m4root.exists()) {
+        (true, true) => Err(anyhow!(
+            "Ambiguous M4ROOT location on card '{}': found in both 'PRIVATE/M4ROOT' and card root 'M4ROOT'",
+            card.display()
+        )),
+        (true, false) => Ok(Some(private_m4root)),
+        (false, true) => Ok(Some(root_m4root)),
+        (false, false) => Ok(None),
+    }
+}
+
 fn filetype(file: &Path, source_media_location: &Path) -> Result<JsonFileInfoTypes> {
     let extension = get_extension_str(file)?;
     let file_str = file.to_string_lossy();
@@ -51,12 +66,18 @@ fn filetype(file: &Path, source_media_location: &Path) -> Result<JsonFileInfoTyp
     }
 
     if grandparent_name == "M4ROOT" {
-        let private_folder = grandparent_folder.parent().context("Traversing path backwards, expected to reach PRIVATE folder but failed")?;
-        let private_folder_name = osstr_to_str(private_folder.file_name().ok_or_else(|| anyhow!("failed to get filename of what's expected to be the PRIVATE folder"))?)?;
-        let expected_source_media_location = private_folder.parent().context("Traversing path backwards, expected to reach card dir but failed")?
-                                                           .parent().context("Traversing path backwards, expected to reach source media dir but failed")?;
+        let m4root_parent = grandparent_folder.parent().context("Traversing path backwards, expected to reach M4ROOT parent dir but failed")?;
+        let m4root_parent_name = osstr_to_str(m4root_parent.file_name().ok_or_else(|| anyhow!("failed to get filename of M4ROOT parent dir"))?)?;
 
-        if private_folder_name == "PRIVATE" && expected_source_media_location == source_media_location {
+        // M4ROOT may live under PRIVATE/ for SD Cards or directly in the card root for CF Express Cards
+        let expected_source_media_location = if m4root_parent_name == "PRIVATE" {
+            m4root_parent.parent().context("Traversing path backwards, expected to reach card dir but failed")?
+                         .parent().context("Traversing path backwards, expected to reach source media dir but failed")?
+        } else {
+            m4root_parent.parent().context("Traversing path backwards, expected to reach source media dir but failed")?
+        };
+
+        if expected_source_media_location == source_media_location {
             let m4root_subfolder_name = osstr_to_str(parent_folder.file_name().ok_or_else(|| anyhow!("failed to get filename of what's expected to be the M4ROOT folder"))?)?;
             return match m4root_subfolder_name {
                 "CLIP" => {
@@ -134,15 +155,17 @@ impl SourceMediaInterface for SonyInterface {
                  files.append(&mut image_set);
             }
         }
-        let mut videos = filter_dir(source_media_card.join("PRIVATE/M4ROOT/THMBNL/").as_path(),|_filename: &str, ext: Option<&str>, path:&PathBuf, path_str: &str|{
-            match ext {
-                Some("JPG") => {
-                    Ok(Some(create_part_file(path_str.to_string(), filetype(path, source_media_location)?, 1, 1, None)))
+        if let Some(m4root) = find_m4root(source_media_card)? {
+            let mut videos = filter_dir(m4root.join("THMBNL/").as_path(),|_filename: &str, ext: Option<&str>, path:&PathBuf, path_str: &str|{
+                match ext {
+                    Some("JPG") => {
+                        Ok(Some(create_part_file(path_str.to_string(), filetype(path, source_media_location)?, 1, 1, None)))
+                    }
+                    Some(_) | None => Err(anyhow!("Unexpected file {}", path_str)),
                 }
-                Some(_) | None => Err(anyhow!("Unexpected file {}", path_str)),
-            }
-        })?;
-        files.append(&mut videos);
+            })?;
+            files.append(&mut videos);
+        }
 
         Ok(files)
     }
@@ -169,16 +192,18 @@ impl SourceMediaInterface for SonyInterface {
                  files.append(&mut image_set);
             }
         }
-        let mut videos = filter_dir(source_media_card.join("PRIVATE/M4ROOT/CLIP/").as_path(),|_filename: &str, ext: Option<&str>, path:&PathBuf, path_str: &str|{
-            match ext {
-                Some("MP4") => {
-                    Ok(Some(create_part_file(path_str.to_string(), filetype(path, source_media_location)?, 1, 1, None)))
+        if let Some(m4root) = find_m4root(source_media_card)? {
+            let mut videos = filter_dir(m4root.join("CLIP/").as_path(),|_filename: &str, ext: Option<&str>, path:&PathBuf, path_str: &str|{
+                match ext {
+                    Some("MP4") => {
+                        Ok(Some(create_part_file(path_str.to_string(), filetype(path, source_media_location)?, 1, 1, None)))
+                    }
+                    Some("XML") => Ok(None),
+                    Some(_) | None => Err(anyhow!("Unexpected file {}", path_str)),
                 }
-                Some("XML") => Ok(None),
-                Some(_) | None => Err(anyhow!("Unexpected file {}", path_str)),
-            }
-        })?;
-        files.append(&mut videos);
+            })?;
+            files.append(&mut videos);
+        }
 
         Ok(files)
     }
