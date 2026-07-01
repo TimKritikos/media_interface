@@ -55,6 +55,10 @@ fn filetype(file: &Path, source_media_location: &Path) -> Result<JsonFileInfoTyp
         let expected_source_media_location = grandparent_folder.parent().context("Traversing path backwards, expected to reach card dir but failed")?
                                                                .parent().context("Traversing path backwards, expected to reach source media dir but failed")?;
 
+        //This check would error out on date from folders or custom suffix folders. I am not using
+        //those features so it's better for me to get an error instead of accidently matching
+        //something but i would be open to removing this. The rest of the codebase should support
+        //it otherwise but has not been tested.
         if parent_folder_name.ends_with("MSDCF") && expected_source_media_location == source_media_location {
             return match extension{
                 "JPG" => Ok(JsonFileInfoTypes{ file_type:FileImage,    item_type:ItemImage }),
