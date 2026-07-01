@@ -92,7 +92,13 @@ fn filetype(file: &Path, source_media_location: &Path) -> Result<JsonFileInfoTyp
                         "JPG" => Ok(JsonFileInfoTypes{ file_type:FileImagePreview, item_type:ItemVideo }),
                         _ => Err(anyhow!("unexpected input file extension '{}' in file '{}'", extension, file_str))
                     }
-                }
+                },
+                "SUB" => {
+                    match extension {
+                        "MP4" => Ok(JsonFileInfoTypes{ file_type:FileVideoPreview, item_type:ItemVideo }),
+                        _ => Err(anyhow!("unexpected input file extension '{}' in file '{}'", extension, file_str))
+                    }
+                },
                 _ => Err(anyhow!("File '{}' in M4ROOT directory has an invalid subfolder name '{}'", file_str, m4root_subfolder_name))
             }
         }
@@ -105,15 +111,17 @@ enum VideoFiles{
     Thumbnail,
     Video,
     Metadata,
+    VideoPreview,
 }
 
 fn get_video_id( file:&Path, file_type:VideoFiles ) -> Result<String> {
     let input_filename = file.file_name().ok_or_else(|| anyhow!("Couldn't get filename of video file"))?.to_string_lossy();
 
     Ok( match file_type {
-        VideoFiles::Thumbnail => input_filename[1..=4].to_string(),
-        VideoFiles::Video     => input_filename[1..=4].to_string(),
-        VideoFiles::Metadata  => input_filename[1..=4].to_string(),
+        VideoFiles::Thumbnail    => input_filename[1..=4].to_string(),
+        VideoFiles::Video        => input_filename[1..=4].to_string(),
+        VideoFiles::Metadata     => input_filename[1..=4].to_string(),
+        VideoFiles::VideoPreview => input_filename[1..=4].to_string(),
     } )
 }
 
@@ -121,9 +129,10 @@ fn create_video_file( input_file:&Path, id:&String, file_type:VideoFiles ) -> Re
     let m4root = input_file.parent().context("Traversing path backwards, expected to reach m4root subfolder but failed")?
                            .parent().context("Traversing path backwards, expected to reach m4root dir but failed")?;
     Ok ( match file_type{
-        VideoFiles::Video     => m4root.join("CLIP")  .join(format!("C{}.MP4", id)),
-        VideoFiles::Metadata  => m4root.join("CLIP")  .join(format!("C{}M01.XML", id)),
-        VideoFiles::Thumbnail => m4root.join("THMBNL").join(format!("C{}T01.JPG", id)),
+        VideoFiles::Video        => m4root.join("CLIP")  .join(format!("C{}.MP4", id)),
+        VideoFiles::Metadata     => m4root.join("CLIP")  .join(format!("C{}M01.XML", id)),
+        VideoFiles::Thumbnail    => m4root.join("THMBNL").join(format!("C{}T01.JPG", id)),
+        VideoFiles::VideoPreview => m4root.join("SUB")   .join(format!("C{}S03.MP4", id)),
     } )
 }
 
@@ -226,9 +235,10 @@ impl SourceMediaInterface for SonyInterface {
             }
             ItemVideo => {
                 let video_type = match input_file_types.file_type{
-                    FileVideo => VideoFiles::Video,
+                    FileVideo        => VideoFiles::Video,
                     FileImagePreview => VideoFiles::Thumbnail,
-                    FileMetadata => VideoFiles::Metadata,
+                    FileMetadata     => VideoFiles::Metadata,
+                    FileVideoPreview => VideoFiles::VideoPreview,
                     _ => { return Err(anyhow!("Internal error"))}
                 };
 
@@ -239,6 +249,11 @@ impl SourceMediaInterface for SonyInterface {
                     if let Some(item) = create_part_file_that_exists(&file, filetype(&file, source_media_location)?, 1, 1, None, &known_missing_files)?{
                         items.push(item);
                     }
+                }
+
+                let proxy_file = create_video_file(source_media_file, &video_id, VideoFiles::VideoPreview)?;
+                if let Some(item) = create_part_file_if_exists(&proxy_file, filetype(&proxy_file, source_media_location)?, 1, 1, None) {
+                    items.push(item);
                 }
 
                 Ok(items)
