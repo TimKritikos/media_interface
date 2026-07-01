@@ -58,6 +58,7 @@ fn filetype(file: &Path, source_media_location: &Path) -> Result<JsonFileInfoTyp
         if parent_folder_name.ends_with("MSDCF") && expected_source_media_location == source_media_location {
             return match extension{
                 "JPG" => Ok(JsonFileInfoTypes{ file_type:FileImage,    item_type:ItemImage }),
+                "HIF" => Ok(JsonFileInfoTypes{ file_type:FileImage,    item_type:ItemImage }),
                 "ARW" => Ok(JsonFileInfoTypes{ file_type:FileImageRaw, item_type:ItemImage }),
                 _ => Err(anyhow!("unexpected input file extension '{}' in file '{}'", extension, file_str))
             }
@@ -149,13 +150,13 @@ impl SourceMediaInterface for SonyInterface {
                 let mut image_set = filter_dir(&imagedir?.path(),|_filename: &str, ext: Option<&str>, path:&PathBuf, path_str: &str|{
                     match ext {
                         Some("ARW") => {
-                            if ! path.with_extension("JPG").exists(){
+                            if ! path.with_extension("JPG").exists() && ! path.with_extension("HIF").exists() {
                                 Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?, None)?))
                             }else{
                                 Ok(None)
                             }
                         }
-                        Some("JPG") => {
+                        Some("JPG") | Some("HIF") => {
                             Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?, None)?))
                         }
                         Some(_) | None => Err(anyhow!("Unexpected file {}", path_str)),
@@ -185,7 +186,7 @@ impl SourceMediaInterface for SonyInterface {
             for imagedir in fs::read_dir(source_media_card.join(dcim))? {
                  let mut image_set = filter_dir(&imagedir?.path(),|_filename: &str, ext: Option<&str>, path:&PathBuf, path_str: &str|{
                     match ext {
-                        Some("JPG") => {
+                        Some("JPG") | Some("HIF") => {
                             if ! path.with_extension("ARW").exists(){
                                 Ok(Some(create_simple_file(path_str.to_string(), filetype(path, source_media_location)?, None)?))
                             }else{
@@ -225,7 +226,8 @@ impl SourceMediaInterface for SonyInterface {
             ItemImage => {
                 let arw_path = source_media_file.with_extension("ARW");
                 let jpg_path = source_media_file.with_extension("JPG");
-                for i in [arw_path, jpg_path] {
+                let hif_path = source_media_file.with_extension("HIF");
+                for i in [arw_path, jpg_path, hif_path] {
                     if let Some(v) = create_simple_file_if_exists(&i, filetype(&i, source_media_location)?, None)? {
                         items.push(v);
                     }
