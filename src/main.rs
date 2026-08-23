@@ -210,7 +210,7 @@ fn main() -> Result<()> {
         let source_root: PathBuf = config_file_path.parent().unwrap().join(&cam.path);
         let path: PathBuf = source_root.join(&cam.card_subdir);
         let absolute_path: PathBuf = fs::canonicalize(&path)
-            .unwrap_or_else(|e| fail_main(format!("Error reading source media dir {:?}: {}", &path, e)));
+            .unwrap_or_else(|e| fail_main(format!("Error reading source media dir {:?}: {}", path, e)));
         handlers.push(HandlerMapEntry{location:absolute_path,name:cam.handler,root:source_root});
     }
 
@@ -271,7 +271,7 @@ fn handle_action_with_input<F>(input_file: &Path, handlers: Vec<HandlerMapEntry>
             for file_input in known_missing_files_input{
                 let path: PathBuf = per_source_config.parent().unwrap().to_path_buf();
                 let absolute_path: PathBuf = fs::canonicalize(&path)
-                    .unwrap_or_else(|e| fail_main(format!("Error reading errata missing file {:?}: {}", &path, e))).join(file_input);
+                    .unwrap_or_else(|e| fail_main(format!("Error reading errata missing file {:?}: {}", path, e))).join(file_input);
                 known_missing_files.push(absolute_path);
             }
         }
