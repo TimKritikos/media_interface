@@ -27,6 +27,9 @@ use crate::helpers::FileType::*;
 
 pub struct ComGoogleAndroidGoogleCameraInterface;
 
+//TODO: Add code for handling known missing files
+//TODO: Add checks if there are none already for writing out non existent files in the JSON
+
 #[derive(Debug)]
 enum GoogleType{
     Raw,
