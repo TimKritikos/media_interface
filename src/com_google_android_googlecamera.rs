@@ -42,25 +42,30 @@ enum GoogleType{
     Pano,
 }
 
+const FILENAME_PREFIX: &str = "PXL_";
+const DATE_LEN: usize = 8; // YYYYMMDD
+const TIME_LEN: usize = 9; // HHMMSSmmm
+const TIMESTAMP_LEN: usize = DATE_LEN + 1 + TIME_LEN; // + 1 for the '_' separating date and time
+const FULL_PREFIX_LEN: usize = FILENAME_PREFIX.len() + TIMESTAMP_LEN;
+
 fn file_to_google_type(filename:&str) -> Result<GoogleType> {
     let rest = filename
-        .strip_prefix("PXL_")
-        .ok_or(anyhow!("Filename {} doesn't start with \"PXL_\"", filename))?;
+        .strip_prefix(FILENAME_PREFIX)
+        .ok_or_else(|| anyhow!("Filename {} doesn't start with {:?}", filename, FILENAME_PREFIX))?;
 
-    // YYYYMMDD_HHMMSSmmm : 18 bytes
-    if rest.len() < 18 {
+    if rest.len() < TIMESTAMP_LEN {
         return Err(anyhow!("Filename {} doesn't even have enough characters to get a timestamp",filename));
     }
 
-    let timestamp = &rest.as_bytes()[..18];
+    let timestamp = &rest.as_bytes()[..TIMESTAMP_LEN];
 
-    if timestamp[8] != b'_'
-        || ! timestamp[..8].iter().all(u8::is_ascii_digit)
-        || ! timestamp[9..].iter().all(u8::is_ascii_digit) {
+    if timestamp[DATE_LEN] != b'_'
+        || ! timestamp[..DATE_LEN].iter().all(u8::is_ascii_digit)
+        || ! timestamp[DATE_LEN + 1..].iter().all(u8::is_ascii_digit) {
         return Err(anyhow!("Filename {} doesn't have a valid timestamp",filename));
     }
 
-    match &rest[18..] {
+    match &rest[TIMESTAMP_LEN..] {
         ".RAW-01.COVER.jpg" | ".RAW-02.ORIGINAL.dng" =>
             Ok(GoogleType::Raw),
         ".TS.mp4" =>
@@ -170,7 +175,7 @@ impl SourceMediaInterface for ComGoogleAndroidGoogleCameraInterface {
             .ok_or_else(|| anyhow!("filename is not valid UTF-8"))?;
 
         let prefix = filename
-            .get(..22)
+            .get(..FULL_PREFIX_LEN)
             .ok_or_else(|| anyhow!("filename is too short"))?;
 
         let google_type = file_to_google_type(filename)?;
