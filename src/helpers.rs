@@ -78,6 +78,7 @@ pub enum FileType{
 pub enum ItemType{
     ItemVideo,
     ItemImage,
+    ItemImageSphere,
     ItemAudio,
     ItemGNSSTrack,
 }
@@ -151,10 +152,11 @@ fn create_simple_file_unchecked(file_path:String, json_file_info: JsonFileInfoTy
             FileGNSSTrack     => "gnss-track"
         }.to_string(),
         item_type:match json_file_info.item_type{
-            ItemVideo     => "video",
-            ItemImage     => "image",
-            ItemAudio     => "audio",
-            ItemGNSSTrack => "gnss-track",
+            ItemVideo       => "video",
+            ItemImage       => "image",
+            ItemAudio       => "audio",
+            ItemGNSSTrack   => "gnss-track",
+            ItemImageSphere => "image-sphere",
         }.to_string(),
         part_count :    None,
         part_num :      None,
