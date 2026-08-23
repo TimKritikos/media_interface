@@ -181,15 +181,14 @@ impl SourceMediaInterface for ComGoogleAndroidGoogleCameraInterface {
 
 
         for i in get_all_google_types(google_type) {
-            let new_filename = format!("{}/{prefix}{i}",parent.display());
+            let new_filename = format!("{prefix}{i}");
 
-            //TODO: keep the path as a PathBuf and only mess with and join the filename
             //TODO: Remove unwraps
 
             let item_data = if new_filename.ends_with(".mp4"){
-                create_part_file_if_exists(&PathBuf::from(&new_filename), filetype(i.split(".").last().unwrap())?, 1, 1, None)
+                create_part_file_if_exists(&parent.join(&new_filename), filetype(i.split(".").last().unwrap())?, 1, 1, None)
             } else {
-                create_simple_file_if_exists(&PathBuf::from(&new_filename), filetype(i.split(".").last().unwrap())?, None)?
+                create_simple_file_if_exists(&parent.join(&new_filename), filetype(i.split(".").last().unwrap())?, None)?
             };
 
             if let Some(v) = item_data {
