@@ -25,7 +25,6 @@ use crate::FileItem;
 use crate::helpers::ItemType::*;
 use crate::helpers::FileType::*;
 
-
 pub struct ComGoogleAndroidGoogleCameraInterface;
 
 #[derive(Debug)]
@@ -183,12 +182,17 @@ impl SourceMediaInterface for ComGoogleAndroidGoogleCameraInterface {
         for i in get_all_google_types(google_type) {
             let new_filename = format!("{prefix}{i}");
 
-            //TODO: Remove unwraps
+            let ext = i
+                .rsplit_once('.')
+                .map(|(_, ext)| ext)
+                .ok_or_else(|| anyhow!("missing file extension"))?;
+
+            let new_filetype = filetype(ext)?;
 
             let item_data = if new_filename.ends_with(".mp4"){
-                create_part_file_if_exists(&parent.join(&new_filename), filetype(i.split(".").last().unwrap())?, 1, 1, None)
+                create_part_file_if_exists(&parent.join(&new_filename), new_filetype , 1, 1, None)
             } else {
-                create_simple_file_if_exists(&parent.join(&new_filename), filetype(i.split(".").last().unwrap())?, None)?
+                create_simple_file_if_exists(&parent.join(&new_filename), new_filetype , None)?
             };
 
             if let Some(v) = item_data {
