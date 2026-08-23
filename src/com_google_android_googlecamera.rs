@@ -80,6 +80,19 @@ fn file_to_google_type(filename:&str) -> Result<GoogleType> {
     }
 }
 
+fn get_all_google_types( google_type:GoogleType ) -> Vec<String> {
+    match google_type {
+        GoogleType::Raw =>          [ ".RAW-01.COVER.jpg".to_string(),  ".RAW-02.ORIGINAL.dng".to_string() ].to_vec(),
+        GoogleType::Ts =>           [ ".TS.mp4".to_string() ].to_vec(),
+        GoogleType::LongExposure => [ ".LONG_EXPOSURE-01.COVER.jpg".to_string(), ".LONG_EXPOSURE-02.ORIGINAL.jpg".to_string() ].to_vec(),
+        GoogleType::Night =>        [ ".NIGHT.RAW-01.COVER.jpg".to_string(), ".NIGHT.RAW-02.ORIGINAL.dng".to_string() ].to_vec(),
+        GoogleType::PlainVideo =>   [ ".mp4".to_string() ].to_vec(),
+        GoogleType::Photosphere =>  [ ".PHOTOSPHERE.jpg".to_string() ].to_vec(),
+        GoogleType::Portrait =>     [ ".PORTRAIT.jpg".to_string() ].to_vec(),
+        GoogleType::Pano =>         [ ".PANO.jpg".to_string() ].to_vec(),
+    }
+}
+
 ////////////////////////////////////////
 //         File parsing code          //
 ////////////////////////////////////////
@@ -146,8 +159,44 @@ impl SourceMediaInterface for ComGoogleAndroidGoogleCameraInterface {
             }
         })
     }
-    fn get_related(&self, _source_media_location: &Path, _source_media_file: &Path, _known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>>{
-        Err(anyhow!("Badabing"))
+    fn get_related(&self, _source_media_location: &Path, source_media_file: &Path, _known_missing_files: Vec<PathBuf>) -> Result<Vec<FileItem>>{
+
+        let filename = source_media_file
+            .file_name()
+            .ok_or_else(|| anyhow!("path has no filename"))?
+            .to_str()
+            .ok_or_else(|| anyhow!("filename is not valid UTF-8"))?;
+
+        let prefix = filename
+            .get(..22)
+            .ok_or_else(|| anyhow!("filename is too short"))?;
+
+        let google_type = file_to_google_type(filename)?;
+
+        let mut items = Vec::<FileItem>::new();
+
+        let parent = source_media_file
+            .parent()
+            .ok_or_else(|| anyhow!("path has no parent"))?;
+
+
+        for i in get_all_google_types(google_type) {
+            let new_filename = format!("{}/{prefix}{i}",parent.display());
+
+            //TODO: keep the path as a PathBuf and only mess with and join the filename
+            //TODO: Remove unwraps
+
+            let item_data = if new_filename.ends_with(".mp4"){
+                create_part_file_if_exists(&PathBuf::from(&new_filename), filetype(i.split(".").last().unwrap())?, 1, 1, None)
+            } else {
+                create_simple_file_if_exists(&PathBuf::from(&new_filename), filetype(i.split(".").last().unwrap())?, None)?
+            };
+
+            if let Some(v) = item_data {
+                items.push(v);
+            }
+        }
+        Ok(items)
     }
 
     fn name(&self) -> &'static str {
