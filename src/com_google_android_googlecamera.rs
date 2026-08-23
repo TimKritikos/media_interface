@@ -30,7 +30,7 @@ pub struct ComGoogleAndroidGoogleCameraInterface;
 //TODO: Add code for handling known missing files
 //TODO: Add checks if there are none already for writing out non existent files in the JSON
 
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 enum GoogleType{
     Raw,
     Ts,
@@ -87,7 +87,7 @@ fn file_to_google_type(filename:&str) -> Result<GoogleType> {
     }
 }
 
-fn get_all_google_types( google_type:GoogleType ) -> Vec<String> {
+fn get_all_google_types( google_type: &GoogleType ) -> Vec<String> {
     match google_type {
         GoogleType::Raw =>          [ ".RAW-01.COVER.jpg".to_string(),  ".RAW-02.ORIGINAL.dng".to_string() ].to_vec(),
         GoogleType::Ts =>           [ ".TS.mp4".to_string() ].to_vec(),
@@ -104,10 +104,16 @@ fn get_all_google_types( google_type:GoogleType ) -> Vec<String> {
 //         File parsing code          //
 ////////////////////////////////////////
 
-fn filetype(ext: &str) -> Result<JsonFileInfoTypes> {
+fn filetype(ext: &str, google_type: &GoogleType) -> Result<JsonFileInfoTypes> {
     match ext {
         "mp4" => Ok(JsonFileInfoTypes{ file_type:FileVideo,        item_type:ItemVideo }),
-        "jpg" => Ok(JsonFileInfoTypes{ file_type:FileImage,        item_type:ItemImage }),
+        "jpg" => {
+            if google_type == &GoogleType::Photosphere {
+                Ok(JsonFileInfoTypes{ file_type:FileImage,        item_type:ItemImageSphere })
+            }else{
+                Ok(JsonFileInfoTypes{ file_type:FileImage,        item_type:ItemImage })
+            }
+        },
         "dng" => Ok(JsonFileInfoTypes{ file_type:FileImageRaw,     item_type:ItemImage }),
         _ => Err(anyhow!("unkown file extension {:?} trying to determain file type", ext)),
     }
@@ -121,7 +127,9 @@ impl SourceMediaInterface for ComGoogleAndroidGoogleCameraInterface {
 
             let ext = input_ext.ok_or_else(|| anyhow!("Expected filter_dir to porivde a file extension"))?;
 
-            if match file_to_google_type(filename)? {
+            let google_type = file_to_google_type(filename)?;
+
+            if match google_type {
                 GoogleType::Raw =>  ext == "jpg",
                 GoogleType::Ts => true,
                 GoogleType::LongExposure => filename.ends_with("01.COVER.jpg"),
@@ -132,8 +140,8 @@ impl SourceMediaInterface for ComGoogleAndroidGoogleCameraInterface {
                 GoogleType::Pano => true,
             } {
                 match ext {
-                    "mp4" => Ok(Some(create_part_file(path_str.to_string(), filetype(ext)?, 1, 1, None))),
-                    "jpg" => Ok(Some(create_simple_file(path_str.to_string(), filetype(ext)?, None)?)),
+                    "mp4" => Ok(Some(create_part_file(path_str.to_string(), filetype(ext, &google_type)?, 1, 1, None))),
+                    "jpg" => Ok(Some(create_simple_file(path_str.to_string(), filetype(ext, &google_type)?, None)?)),
                     _ => Err(anyhow!("Unexpected file {}", path_str)),
                 }
             } else {
@@ -146,7 +154,9 @@ impl SourceMediaInterface for ComGoogleAndroidGoogleCameraInterface {
 
             let ext = input_ext.ok_or_else(|| anyhow!("Expected filter_dir to porivde a file extension"))?;
 
-            if match file_to_google_type(filename)? {
+            let google_type = file_to_google_type(filename)?;
+
+            if match google_type {
                 GoogleType::Raw =>  ext == "dng",
                 GoogleType::Ts => true,
                 GoogleType::LongExposure => filename.ends_with("02.ORIGINAL.jpg"),
@@ -157,8 +167,8 @@ impl SourceMediaInterface for ComGoogleAndroidGoogleCameraInterface {
                 GoogleType::Pano => true,
             } {
                 match ext {
-                    "mp4" => Ok(Some(create_part_file(path_str.to_string(), filetype(ext)?, 1, 1, None))),
-                    "dng"|"jpg" => Ok(Some(create_simple_file(path_str.to_string(), filetype(ext)?, None)?)),
+                    "mp4" => Ok(Some(create_part_file(path_str.to_string(), filetype(ext, &google_type)?, 1, 1, None))),
+                    "dng"|"jpg" => Ok(Some(create_simple_file(path_str.to_string(), filetype(ext, &google_type)?, None)?)),
                     _ => Err(anyhow!("Unexpected file {}", path_str)),
                 }
             } else {
@@ -187,7 +197,7 @@ impl SourceMediaInterface for ComGoogleAndroidGoogleCameraInterface {
             .ok_or_else(|| anyhow!("path has no parent"))?;
 
 
-        for i in get_all_google_types(google_type) {
+        for i in get_all_google_types(&google_type) {
             let new_filename = format!("{prefix}{i}");
 
             let ext = i
@@ -195,7 +205,7 @@ impl SourceMediaInterface for ComGoogleAndroidGoogleCameraInterface {
                 .map(|(_, ext)| ext)
                 .ok_or_else(|| anyhow!("missing file extension"))?;
 
-            let new_filetype = filetype(ext)?;
+            let new_filetype = filetype(ext, &google_type)?;
 
             let item_data = if new_filename.ends_with(".mp4"){
                 create_part_file_if_exists(&parent.join(&new_filename), new_filetype , 1, 1, None)
