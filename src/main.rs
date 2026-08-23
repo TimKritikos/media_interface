@@ -29,6 +29,7 @@ mod sony_ilcem4_1;
 mod generic_single_file_items;
 mod helpers;
 mod gnss_tracker_generic;
+mod com_google_android_googlecamera;
 
 /////////////////////////////////
 // Command line interface data //
@@ -100,6 +101,7 @@ trait SourceMediaInterface {
 
 fn get_handler(id: &str) -> Result<Box<dyn SourceMediaInterface>> {
     let factories: Vec<fn() -> Box<dyn SourceMediaInterface>> = vec![
+        || Box::new(com_google_android_googlecamera::ComGoogleAndroidGoogleCameraInterface),
         || Box::new(gopro_hero_generic_1::GoProInterface),
         || Box::new(sony_ilcem4_1::SonyInterface),
         || Box::new(generic_single_file_items::GenericSingleFileItem),
