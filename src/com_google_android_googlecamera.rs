@@ -66,13 +66,14 @@ fn file_to_google_type(filename:&str) -> Result<GoogleType> {
     }
 
     match &rest[TIMESTAMP_LEN..] {
-        ".RAW-01.COVER.jpg" | ".RAW-02.ORIGINAL.dng" =>
+        ".RAW-01.COVER.jpg" | ".RAW-01.jpg" | ".RAW-02.ORIGINAL.dng" =>
             Ok(GoogleType::Raw),
         ".TS.mp4" =>
             Ok(GoogleType::Ts),
-        ".LONG_EXPOSURE-01.COVER.jpg" | ".LONG_EXPOSURE-02.ORIGINAL.jpg" =>
+        ".LONG_EXPOSURE-01.COVER.jpg" | ".LONG_EXPOSURE.jpg" | ".LONG_EXPOSURE-02.ORIGINAL.jpg" =>
             Ok(GoogleType::LongExposure),
-        ".NIGHT.RAW-01.COVER.jpg" | ".NIGHT.RAW-02.ORIGINAL.dng" =>
+        // Note, i have not encountered a ".NIGHT.RAW-01.jpg" as of 2026-09-28 but I'm adding it proactively
+        ".NIGHT.RAW-01.COVER.jpg" | ".NIGHT.RAW-01.jpg" | ".NIGHT.RAW-02.ORIGINAL.dng" =>
             Ok(GoogleType::Night),
         ".mp4" =>
             Ok(GoogleType::PlainVideo),
