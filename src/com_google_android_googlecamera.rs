@@ -90,10 +90,10 @@ fn file_to_google_type(filename:&str) -> Result<GoogleType> {
 
 fn get_all_google_types( google_type: &GoogleType ) -> Vec<String> {
     match google_type {
-        GoogleType::Raw =>          [ ".RAW-01.COVER.jpg".to_string(),  ".RAW-02.ORIGINAL.dng".to_string() ].to_vec(),
+        GoogleType::Raw =>          [ ".RAW-01.COVER.jpg".to_string(), ".RAW-01.jpg".to_string(),  ".RAW-02.ORIGINAL.dng".to_string() ].to_vec(),
         GoogleType::Ts =>           [ ".TS.mp4".to_string() ].to_vec(),
-        GoogleType::LongExposure => [ ".LONG_EXPOSURE-01.COVER.jpg".to_string(), ".LONG_EXPOSURE-02.ORIGINAL.jpg".to_string() ].to_vec(),
-        GoogleType::Night =>        [ ".NIGHT.RAW-01.COVER.jpg".to_string(), ".NIGHT.RAW-02.ORIGINAL.dng".to_string() ].to_vec(),
+        GoogleType::LongExposure => [ ".LONG_EXPOSURE-01.COVER.jpg".to_string(), ".LONG_EXPOSURE.jpg".to_string(), ".LONG_EXPOSURE-02.ORIGINAL.jpg".to_string() ].to_vec(),
+        GoogleType::Night =>        [ ".NIGHT.RAW-01.COVER.jpg".to_string(), ".NIGHT.RAW-01.jpg".to_string(), ".NIGHT.RAW-02.ORIGINAL.dng".to_string() ].to_vec(),
         GoogleType::PlainVideo =>   [ ".mp4".to_string() ].to_vec(),
         GoogleType::Photosphere =>  [ ".PHOTOSPHERE.jpg".to_string() ].to_vec(),
         GoogleType::Portrait =>     [ ".PORTRAIT.jpg".to_string() ].to_vec(),
@@ -133,7 +133,7 @@ impl SourceMediaInterface for ComGoogleAndroidGoogleCameraInterface {
             if match google_type {
                 GoogleType::Raw =>  ext == "jpg",
                 GoogleType::Ts => true,
-                GoogleType::LongExposure => filename.ends_with("01.COVER.jpg"),
+                GoogleType::LongExposure => filename.ends_with("01.COVER.jpg") ||  filename.ends_with("LONG_EXPOSURE.jpg"),
                 GoogleType::Night => ext == "jpg",
                 GoogleType::PlainVideo => true,
                 GoogleType::Photosphere => true,
