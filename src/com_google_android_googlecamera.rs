@@ -40,6 +40,7 @@ enum GoogleType{
     Photosphere,
     Portrait,
     Pano,
+    NightSightVideo,
 }
 
 const FILENAME_PREFIX: &str = "PXL_";
@@ -83,6 +84,8 @@ fn file_to_google_type(filename:&str) -> Result<GoogleType> {
             Ok(GoogleType::Portrait),
         ".PANO.jpg" =>
             Ok(GoogleType::Pano),
+        ".NS-01.COVER.mp4" | ".NS-02.MAIN.mp4" =>
+            Ok(GoogleType::NightSightVideo),
         _ =>
             Err(anyhow!("Unknow google file type for file {}",filename)),
     }
@@ -90,14 +93,15 @@ fn file_to_google_type(filename:&str) -> Result<GoogleType> {
 
 fn get_all_google_types( google_type: &GoogleType ) -> Vec<String> {
     match google_type {
-        GoogleType::Raw =>          [ ".RAW-01.COVER.jpg".to_string(), ".RAW-01.jpg".to_string(),  ".RAW-02.ORIGINAL.dng".to_string() ].to_vec(),
-        GoogleType::Ts =>           [ ".TS.mp4".to_string() ].to_vec(),
-        GoogleType::LongExposure => [ ".LONG_EXPOSURE-01.COVER.jpg".to_string(), ".LONG_EXPOSURE.jpg".to_string(), ".LONG_EXPOSURE-02.ORIGINAL.jpg".to_string() ].to_vec(),
-        GoogleType::Night =>        [ ".NIGHT.RAW-01.COVER.jpg".to_string(), ".NIGHT.RAW-01.jpg".to_string(), ".NIGHT.RAW-02.ORIGINAL.dng".to_string() ].to_vec(),
-        GoogleType::PlainVideo =>   [ ".mp4".to_string() ].to_vec(),
-        GoogleType::Photosphere =>  [ ".PHOTOSPHERE.jpg".to_string() ].to_vec(),
-        GoogleType::Portrait =>     [ ".PORTRAIT.jpg".to_string() ].to_vec(),
-        GoogleType::Pano =>         [ ".PANO.jpg".to_string() ].to_vec(),
+        GoogleType::Raw =>             [ ".RAW-01.COVER.jpg".to_string(), ".RAW-01.jpg".to_string(),  ".RAW-02.ORIGINAL.dng".to_string() ].to_vec(),
+        GoogleType::Ts =>              [ ".TS.mp4".to_string() ].to_vec(),
+        GoogleType::LongExposure =>    [ ".LONG_EXPOSURE-01.COVER.jpg".to_string(), ".LONG_EXPOSURE.jpg".to_string(), ".LONG_EXPOSURE-02.ORIGINAL.jpg".to_string() ].to_vec(),
+        GoogleType::Night =>           [ ".NIGHT.RAW-01.COVER.jpg".to_string(), ".NIGHT.RAW-01.jpg".to_string(), ".NIGHT.RAW-02.ORIGINAL.dng".to_string() ].to_vec(),
+        GoogleType::PlainVideo =>      [ ".mp4".to_string() ].to_vec(),
+        GoogleType::Photosphere =>     [ ".PHOTOSPHERE.jpg".to_string() ].to_vec(),
+        GoogleType::Portrait =>        [ ".PORTRAIT.jpg".to_string() ].to_vec(),
+        GoogleType::Pano =>            [ ".PANO.jpg".to_string() ].to_vec(),
+        GoogleType::NightSightVideo => [ ".NS-01.COVER.mp4".to_string() , ".NS-02.MAIN.mp4".to_string()].to_vec(),
     }
 }
 
@@ -139,6 +143,7 @@ impl SourceMediaInterface for ComGoogleAndroidGoogleCameraInterface {
                 GoogleType::Photosphere => true,
                 GoogleType::Portrait => true,
                 GoogleType::Pano => true,
+                GoogleType::NightSightVideo => filename.ends_with(".NS-01.COVER.mp4"),
             } {
                 match ext {
                     "mp4" => Ok(Some(create_part_file(path_str.to_string(), filetype(ext, &google_type)?, 1, 1, None))),
@@ -166,6 +171,7 @@ impl SourceMediaInterface for ComGoogleAndroidGoogleCameraInterface {
                 GoogleType::Photosphere => true,
                 GoogleType::Portrait => true,
                 GoogleType::Pano => true,
+                GoogleType::NightSightVideo => filename.ends_with(".NS-02.MAIN.mp4"),
             } {
                 match ext {
                     "mp4" => Ok(Some(create_part_file(path_str.to_string(), filetype(ext, &google_type)?, 1, 1, None))),
