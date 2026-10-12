@@ -42,6 +42,10 @@ enum GoogleType{
     Pano,
     NightSightVideo,
     ActionPanPhoto,
+    BurstPhoto, // This is use for that feature where you take a photo of a group and then you have
+                // someone else hold the camera and you join the group, it takes another photo and
+                // the software will stitch the two together but from the nameing i'm afraid it's
+                // used elsewhere
 }
 
 const FILENAME_PREFIX: &str = "PXL_";
@@ -81,7 +85,9 @@ fn file_to_google_type(filename:&str) -> Result<GoogleType> {
             Ok(GoogleType::PlainVideo),
         ".PHOTOSPHERE.jpg" =>
             Ok(GoogleType::Photosphere),
-        ".PORTRAIT.jpg" =>
+        ".PORTRAIT.jpg" | ".PORTRAIT.ORIGINAL.jpg" => // Pixel 7a has been observed with the former
+                                                      // and Pixel 9 pro with the latter but as far
+                                                      // as i can tell never both
             Ok(GoogleType::Portrait),
         ".PANO.jpg" =>
             Ok(GoogleType::Pano),
@@ -89,6 +95,8 @@ fn file_to_google_type(filename:&str) -> Result<GoogleType> {
             Ok(GoogleType::NightSightVideo),
         ".ACTION_PAN-01.COVER.jpg" | ".ACTION_PAN-02.ORIGINAL.jpg" =>
             Ok(GoogleType::ActionPanPhoto),
+        ".BURST-01.COVER.jpg" | ".BURST-02.jpg" =>
+            Ok(GoogleType::BurstPhoto),
         _ =>
             Err(anyhow!("Unknow google file type for file {}",filename)),
     }
@@ -102,10 +110,12 @@ fn get_all_google_types( google_type: &GoogleType ) -> Vec<String> {
         GoogleType::Night =>           [ ".NIGHT.RAW-01.COVER.jpg".to_string(), ".NIGHT.RAW-01.jpg".to_string(), ".NIGHT.RAW-02.ORIGINAL.dng".to_string() ].to_vec(),
         GoogleType::PlainVideo =>      [ ".mp4".to_string() ].to_vec(),
         GoogleType::Photosphere =>     [ ".PHOTOSPHERE.jpg".to_string() ].to_vec(),
-        GoogleType::Portrait =>        [ ".PORTRAIT.jpg".to_string() ].to_vec(),
+        GoogleType::Portrait =>        [ ".PORTRAIT.jpg".to_string(), ".PORTRAIT.ORIGINAL.jpg".to_string() ].to_vec(),
         GoogleType::Pano =>            [ ".PANO.jpg".to_string() ].to_vec(),
         GoogleType::NightSightVideo => [ ".NS-01.COVER.mp4".to_string() , ".NS-02.MAIN.mp4".to_string()].to_vec(),
         GoogleType::ActionPanPhoto  => [ ".ACTION_PAN-01.COVER.jpg".to_string() , ".ACTION_PAN-02.ORIGINAL.jpg".to_string()].to_vec(),
+        GoogleType::BurstPhoto      => [ ".BURST-01.COVER.jpg".to_string() , ".BURST-02.jpg".to_string()].to_vec(),
+
     }
 }
 
@@ -149,6 +159,7 @@ impl SourceMediaInterface for ComGoogleAndroidGoogleCameraInterface {
                 GoogleType::Pano => true,
                 GoogleType::NightSightVideo => filename.ends_with(".NS-01.COVER.mp4"),
                 GoogleType::ActionPanPhoto => filename.ends_with(".ACTION_PAN-01.COVER.jpg"),
+                GoogleType::BurstPhoto =>  filename.ends_with(".BURST-01.COVER.jpg"),
             } {
                 match ext {
                     "mp4" => Ok(Some(create_part_file(path_str.to_string(), filetype(ext, &google_type)?, 1, 1, None))),
@@ -178,6 +189,7 @@ impl SourceMediaInterface for ComGoogleAndroidGoogleCameraInterface {
                 GoogleType::Pano => true,
                 GoogleType::NightSightVideo => filename.ends_with(".NS-02.MAIN.mp4"),
                 GoogleType::ActionPanPhoto => filename.ends_with(".ACTION_PAN-02.ORIGINAL.jpg"),
+                GoogleType::BurstPhoto =>  filename.ends_with(".BURST-02.jpg"),
             } {
                 match ext {
                     "mp4" => Ok(Some(create_part_file(path_str.to_string(), filetype(ext, &google_type)?, 1, 1, None))),
