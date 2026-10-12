@@ -41,6 +41,7 @@ enum GoogleType{
     Portrait,
     Pano,
     NightSightVideo,
+    ActionPanPhoto,
 }
 
 const FILENAME_PREFIX: &str = "PXL_";
@@ -86,6 +87,8 @@ fn file_to_google_type(filename:&str) -> Result<GoogleType> {
             Ok(GoogleType::Pano),
         ".NS-01.COVER.mp4" | ".NS-02.MAIN.mp4" =>
             Ok(GoogleType::NightSightVideo),
+        ".ACTION_PAN-01.COVER.jpg" | ".ACTION_PAN-02.ORIGINAL.jpg" =>
+            Ok(GoogleType::ActionPanPhoto),
         _ =>
             Err(anyhow!("Unknow google file type for file {}",filename)),
     }
@@ -102,6 +105,7 @@ fn get_all_google_types( google_type: &GoogleType ) -> Vec<String> {
         GoogleType::Portrait =>        [ ".PORTRAIT.jpg".to_string() ].to_vec(),
         GoogleType::Pano =>            [ ".PANO.jpg".to_string() ].to_vec(),
         GoogleType::NightSightVideo => [ ".NS-01.COVER.mp4".to_string() , ".NS-02.MAIN.mp4".to_string()].to_vec(),
+        GoogleType::ActionPanPhoto  => [ ".ACTION_PAN-01.COVER.jpg".to_string() , ".ACTION_PAN-02.ORIGINAL.jpg".to_string()].to_vec(),
     }
 }
 
@@ -144,6 +148,7 @@ impl SourceMediaInterface for ComGoogleAndroidGoogleCameraInterface {
                 GoogleType::Portrait => true,
                 GoogleType::Pano => true,
                 GoogleType::NightSightVideo => filename.ends_with(".NS-01.COVER.mp4"),
+                GoogleType::ActionPanPhoto => filename.ends_with(".ACTION_PAN-01.COVER.jpg"),
             } {
                 match ext {
                     "mp4" => Ok(Some(create_part_file(path_str.to_string(), filetype(ext, &google_type)?, 1, 1, None))),
@@ -172,6 +177,7 @@ impl SourceMediaInterface for ComGoogleAndroidGoogleCameraInterface {
                 GoogleType::Portrait => true,
                 GoogleType::Pano => true,
                 GoogleType::NightSightVideo => filename.ends_with(".NS-02.MAIN.mp4"),
+                GoogleType::ActionPanPhoto => filename.ends_with(".ACTION_PAN-02.ORIGINAL.jpg"),
             } {
                 match ext {
                     "mp4" => Ok(Some(create_part_file(path_str.to_string(), filetype(ext, &google_type)?, 1, 1, None))),
